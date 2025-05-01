@@ -9,7 +9,7 @@ from tkinter import messagebox
 import re # Import regex for VIN parsing
 import argparse # For command-line arguments
 
-# Helper: Build an Open Protocol message. 
+# Helper: Build an Open Protocol message.
 def build_message(mid: int, rev: int = 1, data: str = "", no_ack: bool = False,
                   station: str = "00", spindle: str = "00") -> bytes:
     """
@@ -461,7 +461,7 @@ class OpenProtocolEmulator:
         tool_protocol_status_var = tk.StringVar(value="Tool Status: Enabled")
         # --- End GUI Variables ---
 
-        # --- GUI Callbacks  ---
+        # --- GUI Callbacks ---
         def apply_settings():
             try:
                 new_vin = vin_var.get()
