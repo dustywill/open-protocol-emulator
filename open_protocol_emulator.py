@@ -6,8 +6,8 @@ import datetime
 import random
 import tkinter as tk
 from tkinter import messagebox
-import re  # Import regex for VIN parsing
-import argparse  # For command-line arguments
+import re # Import regex for VIN parsing
+import argparse # For command-line arguments
 
 # Helper: Build an Open Protocol message.
 def build_message(mid: int, rev: int = 1, data: str = "", no_ack: bool = False,
@@ -32,13 +32,12 @@ def build_message(mid: int, rev: int = 1, data: str = "", no_ack: bool = False,
     message = f"{length_str}{body}\x00"
     return message.encode('ascii')
 
-
 class OpenProtocolEmulator:
     # Added port and name to constructor with defaults
     def __init__(self, host='0.0.0.0', port=4545, controller_name="OpenProtocolSim"):
         self.host = host
-        self.port = port  # Use passed-in port
-        self.controller_name = controller_name.ljust(25)[:25]  # Use passed-in name, ensure length
+        self.port = port # Use passed-in port
+        self.controller_name = controller_name.ljust(25)[:25] # Use passed-in name, ensure length
 
         # State variables
         self.session_active = False
@@ -57,8 +56,8 @@ class OpenProtocolEmulator:
         self.vin_no_ack = False
         self.result_subscribed = False
         self.result_no_ack = False
-        self.tool_enabled = True  # Protocol state
-        self.auto_send_loop_active = True  # GUI state
+        self.tool_enabled = True # Protocol state
+        self.auto_send_loop_active = True # GUI state
         self.pset_last_change = None
         self.pset_subscribed = False
         self.client_socket = None
@@ -74,8 +73,7 @@ class OpenProtocolEmulator:
             self.vin_prefix = match.group(1)
             self.vin_numeric_str = match.group(2)
             self.vin_padding = len(self.vin_numeric_str)
-            print(
-                f"[VIN Parse] Parsed: Prefix='{self.vin_prefix}', Numeric='{self.vin_numeric_str}', Padding={self.vin_padding}")
+            print(f"[VIN Parse] Parsed: Prefix='{self.vin_prefix}', Numeric='{self.vin_numeric_str}', Padding={self.vin_padding}")
             return True
         else:
             print(f"[VIN Parse] Error: Could not parse VIN '{vin_string}'. Using defaults.")
@@ -111,26 +109,23 @@ class OpenProtocolEmulator:
         try:
             server_sock.bind((self.host, self.port))
         except OSError as e:
-            print(f"[Server Error] Failed to bind to port {self.port}: {e}")
-            print("Check if another application is using the port.")
-            return  # Exit if cannot bind
+             print(f"[Server Error] Failed to bind to port {self.port}: {e}")
+             print("Check if another application is using the port.")
+             return # Exit if cannot bind
         server_sock.listen(1)
-        print(
-            f"[Server] Listening on {self.host}:{self.port} with name '{self.controller_name.strip()}'...")
+        print(f"[Server] Listening on {self.host}:{self.port} with name '{self.controller_name.strip()}'...")
         while True:
             try:
                 client_sock, addr = server_sock.accept()
             except OSError:
                 print("[Server] Error accepting connection (server socket closed?).")
-                break  # Exit loop if server socket has issues
+                break # Exit loop if server socket has issues
 
             if self.session_active:
                 print(f"[Server] Rejecting connection from {addr}: already connected.")
                 err_msg = build_message(4, rev=1, data="000196")
-                try:
-                    client_sock.sendall(err_msg)
-                except:
-                    pass
+                try: client_sock.sendall(err_msg)
+                except: pass
                 client_sock.close()
                 continue
 
@@ -138,10 +133,8 @@ class OpenProtocolEmulator:
             self.batch_counter = 0
             self.tool_enabled = True
             self.auto_send_loop_active = True
-            print(
-                f"[Server] New client connected from {addr}, resetting counters and enabling tool/loop.")
-            threading.Thread(target=self.handle_client, args=(client_sock, addr),
-                             daemon=True).start()
+            print(f"[Server] New client connected from {addr}, resetting counters and enabling tool/loop.")
+            threading.Thread(target=self.handle_client, args=(client_sock, addr), daemon=True).start()
 
     def send_to_client(self, msg_bytes: bytes):
         """Thread-safe send to the client."""
@@ -153,18 +146,14 @@ class OpenProtocolEmulator:
                     print(f"[Send] MID {log_msg[4:8]} ({len(msg_bytes)} bytes): {log_msg[20:60]}...")
                 except (OSError, BrokenPipeError, ConnectionResetError) as e:
                     print(f"[Send Error] Connection issue: {e}")
-                    try:
-                        self.client_socket.close()
-                    except:
-                        pass
+                    try: self.client_socket.close()
+                    except: pass
                     self.client_socket = None
-                    self.session_active = False  # Ensure session ends on error
+                    self.session_active = False # Ensure session ends on error
                 except Exception as e:
                     print(f"[Send Error] Unexpected error: {e}")
-                    try:
-                        self.client_socket.close()
-                    except:
-                        pass
+                    try: self.client_socket.close()
+                    except: pass
                     self.client_socket = None
                     self.session_active = False
 
@@ -174,72 +163,49 @@ class OpenProtocolEmulator:
         print(f"[Client] Connection established with {addr}")
         buffer = b""
         while True:
-            try:
-                data = sock.recv(1024)
-            except (ConnectionResetError, OSError) as e:
-                print(f"[Recv Error] Connection issue: {e}");
-                break
-            except Exception as e:
-                print(f"[Recv Error] Unexpected error: {e}");
-                break
-            if not data:
-                print("[Client] Connection closed by peer.");
-                break
+            try: data = sock.recv(1024)
+            except (ConnectionResetError, OSError) as e: print(f"[Recv Error] Connection issue: {e}"); break
+            except Exception as e: print(f"[Recv Error] Unexpected error: {e}"); break
+            if not data: print("[Client] Connection closed by peer."); break
             buffer += data
             while True:
-                if len(buffer) < 4:
-                    break
-                try:
-                    length = int(buffer[:4].decode('ascii'))
-                except ValueError:
-                    print("[Error] Invalid length field");
-                    buffer = b"";
-                    break
-                if len(buffer) < length + 1:
-                    break
+                if len(buffer) < 4: break
+                try: length = int(buffer[:4].decode('ascii'))
+                except ValueError: print("[Error] Invalid length field"); buffer = b""; break
+                if len(buffer) < length + 1: break
 
-                full_msg = buffer[:length + 1]
+                full_msg = buffer[:length+1]
                 log_msg_recv = full_msg.decode('ascii', errors='ignore').replace('\x00', '')
                 print(f"[Recv] MID {log_msg_recv[4:8]} ({len(full_msg)} bytes): {log_msg_recv[20:60]}...")
-                buffer = buffer[length + 1:]
+                buffer = buffer[length+1:]
                 self.process_message(full_msg)
 
         print(f"[Client] Cleaning up connection from {addr}.")
         self.session_active = False
-        self.vin_subscribed = False;
-        self.result_subscribed = False;
-        self.pset_subscribed = False
-        try:
-            sock.close()
-        except:
-            pass
+        self.vin_subscribed = False; self.result_subscribed = False; self.pset_subscribed = False
+        try: sock.close()
+        except: pass
         self.client_socket = None
 
     def process_message(self, msg: bytes):
         """Parse and dispatch an Open Protocol message."""
-        if len(msg) < 21:
-            print(f"[Error] Malformed message (too short): {msg}");
-            return
+        if len(msg) < 21: print(f"[Error] Malformed message (too short): {msg}"); return
         try:
             mid = msg[4:8].decode('ascii')
             rev = msg[8:11].decode('ascii')
             data_field = msg[20:-1].decode('ascii')
             mid_int = int(mid)
         except (ValueError, IndexError, UnicodeDecodeError) as e:
-            print(f"[Error] Parse error: {e}, Message: {msg}");
-            return
+            print(f"[Error] Parse error: {e}, Message: {msg}"); return
 
         # --- MID Dispatch Logic ---
-        if mid_int == 1:  # MID 0001 Communication start
-            if self.session_active:
-                resp = build_message(4, rev=1, data="000196")
+        if mid_int == 1: # MID 0001 Communication start
+            if self.session_active: resp = build_message(4, rev=1, data="000196")
             else:
                 requested_rev = int(rev) if rev.strip() else 1
-                if requested_rev > 1:
-                    resp = build_message(4, rev=1, data="000197")
+                if requested_rev > 1: resp = build_message(4, rev=1, data="000197")
                 else:
-                    cell_id = "0001";
-                    channel_id = "01"
+                    cell_id = "0001"; channel_id = "01"
                     # Use configured controller name here
                     data = f"01{cell_id}02{channel_id}03{self.controller_name}"
                     resp = build_message(2, rev=1, data=data)
@@ -249,76 +215,72 @@ class OpenProtocolEmulator:
             self.send_to_client(resp)
             return
 
-        elif mid_int == 3:  # MID 0003 Communication stop
+        elif mid_int == 3: # MID 0003 Communication stop
             resp = build_message(5, rev=1, data="0003")
             self.send_to_client(resp)
             print("[Session] Communication stop received. Ending session.")
             self.session_active = False
-            self.vin_subscribed = False;
-            self.result_subscribed = False;
-            self.pset_subscribed = False
+            self.vin_subscribed = False; self.result_subscribed = False; self.pset_subscribed = False
             try:
-                if self.client_socket:
-                    self.client_socket.close()
-            except:
-                pass
+                if self.client_socket: self.client_socket.close()
+            except: pass
             self.client_socket = None
             return
 
-        elif mid_int == 4:
-            print(f"[Info] Received MID 0004 from client: Data='{data_field}' (ignored).")
-        elif mid_int == 5:
-            print(f"[Info] Received MID 0005 from client: Data='{data_field}' (ignored).")
-        elif mid_int == 9999:
+        elif mid_int == 4: print(f"[Info] Received MID 0004 from client: Data='{data_field}' (ignored).")
+        elif mid_int == 5: print(f"[Info] Received MID 0005 from client: Data='{data_field}' (ignored).")
+        elif mid_int == 9999: 
             print("[KeepAlive] Received keep-alive message.")
+            resp = build_message(9999, rev=1) 
+            self.send_to_client(resp)
+            print("[KeepAlive] Echo back keep-alive message.")
+            
+
 
         # --- Tool Control --- Corrected Logic ---
-        elif mid_int == 40:  # MID 0040 Disable tool command (Controller -> Client) - Ignore if received
+        elif mid_int == 40: # MID 0040 Disable tool command (Controller -> Client) - Ignore if received
             print("[Tool] Received Disable Tool Command (MID 0040) from client (unexpected). Ignoring.")
             return
-        elif mid_int == 41:  # MID 0041 Enable tool command (Controller -> Client) - Ignore if received
+        elif mid_int == 41: # MID 0041 Enable tool command (Controller -> Client) - Ignore if received
             print("[Tool] Received Enable Tool Command (MID 0041) from client (unexpected). Ignoring.")
             return
-        elif mid_int == 42:  # MID 0042 Request tool disable (Client -> Controller)
+        elif mid_int == 42: # MID 0042 Request tool disable (Client -> Controller)
             print("[Tool] Received Request Tool Disable (MID 0042).")
             self.tool_enabled = False
-            resp = build_message(5, rev=1, data="0042")  # Confirm with MID 0005
+            resp = build_message(5, rev=1, data="0042") # Confirm with MID 0005
             self.send_to_client(resp)
             print("[Tool] Tool Disabled. Sent MID 0040 confirmation.")
             return
-        elif mid_int == 43:  # MID 0043 Request tool enable (Client -> Controller)
+        elif mid_int == 43: # MID 0043 Request tool enable (Client -> Controller)
             print("[Tool] Received Request Tool Enable (MID 0043).")
             self.tool_enabled = True
-            resp = build_message(5, rev=1, data="0043")  # Confirm with MID 0005
+            resp = build_message(5, rev=1, data="0043") # Confirm with MID 0005
             self.send_to_client(resp)
             print("[Tool] Tool Enabled. Sent MID 0041 confirmation.")
             return
         # --- End Tool Control ---
 
         # (Other MID handlers remain largely the same, ensure they use self.controller_name if needed)
-        elif mid_int == 18:  # MID 0018 Select Parameter set
+        elif mid_int == 18: # MID 0018 Select Parameter set
             pset_id = data_field.strip()
             if pset_id in self.available_psets:
-                self.current_pset = pset_id;
-                self.pset_last_change = datetime.datetime.now()
-                resp = build_message(5, rev=1, data="0018")  # Accept
+                self.current_pset = pset_id; self.pset_last_change = datetime.datetime.now()
+                resp = build_message(5, rev=1, data="0018") # Accept
                 print(f"[Pset] Pset {pset_id} selected.")
                 if self.pset_subscribed:
                     mid15_data = self.current_pset.rjust(3, '0')
                     mid15_msg = build_message(15, rev=1, data=mid15_data)
                     self.send_to_client(mid15_msg)
                     print(f"[Pset] Sent MID 0015: {self.current_pset}")
-            else:
-                resp = build_message(4, rev=1, data="001802")  # Error: Pset not found
+            else: resp = build_message(4, rev=1, data="001802") # Error: Pset not found
             self.send_to_client(resp)
             return
 
-        elif mid_int == 14:  # MID 0014 Parameter set selected subscribe
-            if self.pset_subscribed:
-                resp = build_message(4, rev=1, data="001406")  # Error: Subscribed
+        elif mid_int == 14: # MID 0014 Parameter set selected subscribe
+            if self.pset_subscribed: resp = build_message(4, rev=1, data="001406") # Error: Subscribed
             else:
                 self.pset_subscribed = True
-                resp = build_message(5, rev=1, data="0014")  # Accept
+                resp = build_message(5, rev=1, data="0014") # Accept
                 print("[Pset] Pset subscription accepted.")
                 if self.current_pset:
                     mid15_data = self.current_pset.rjust(3, '0')
@@ -328,17 +290,15 @@ class OpenProtocolEmulator:
             self.send_to_client(resp)
             return
 
-        elif mid_int == 16:
-            print("[Pset] Pset selected acknowledged by client (MID 0016).")
+        elif mid_int == 16: print("[Pset] Pset selected acknowledged by client (MID 0016).")
 
-        elif mid_int == 50:  # MID 0050 VIN download request
+        elif mid_int == 50: # MID 0050 VIN download request
             vin = data_field.strip()
             print(f"[VIN] Received VIN download: {vin}")
             if self._parse_vin(vin):
-                self.current_vin = vin;
-                self.batch_counter = 0
-                print("[VIN] Batch counter reset due to new VIN.")
-            resp = build_message(5, rev=1, data="0050")  # Accept
+                 self.current_vin = vin; self.batch_counter = 0
+                 print("[VIN] Batch counter reset due to new VIN.")
+            resp = build_message(5, rev=1, data="0050") # Accept
             self.send_to_client(resp)
             if self.vin_subscribed:
                 vin_param = self.current_vin.ljust(25)[:25]
@@ -347,17 +307,14 @@ class OpenProtocolEmulator:
                 print(f"[VIN] Sent VIN update (MID 0052): {self.current_vin}")
             return
 
-        elif mid_int == 51:  # MID 0051 VIN subscribe
+        elif mid_int == 51: # MID 0051 VIN subscribe
             no_ack_flag = msg[11:12].decode('ascii')
             req_rev = int(rev) if rev.strip() else 1
-            if req_rev > 1:
-                resp = build_message(4, rev=1, data="005197")  # Error: Revision
-            elif self.vin_subscribed:
-                resp = build_message(4, rev=1, data="005106")  # Error: Subscribed
+            if req_rev > 1: resp = build_message(4, rev=1, data="005197") # Error: Revision
+            elif self.vin_subscribed: resp = build_message(4, rev=1, data="005106") # Error: Subscribed
             else:
-                self.vin_subscribed = True;
-                self.vin_no_ack = (no_ack_flag == "1")
-                resp = build_message(5, rev=1, data="0051")  # Accept
+                self.vin_subscribed = True; self.vin_no_ack = (no_ack_flag == "1")
+                resp = build_message(5, rev=1, data="0051") # Accept
                 print("[VIN] Subscription accepted.")
                 if self.current_vin:
                     vin_param = self.current_vin.ljust(25)[:25]
@@ -367,54 +324,45 @@ class OpenProtocolEmulator:
             self.send_to_client(resp)
             return
 
-        elif mid_int == 53:
-            print("[VIN] VIN event acknowledged by client (MID 0053).")
+        elif mid_int == 53: print("[VIN] VIN event acknowledged by client (MID 0053).")
 
-        elif mid_int == 54:  # MID 0054 VIN unsubscribe
+        elif mid_int == 54: # MID 0054 VIN unsubscribe
             if self.vin_subscribed:
-                self.vin_subscribed = False;
-                resp = build_message(5, rev=1, data="0054")  # Accept
+                self.vin_subscribed = False; resp = build_message(5, rev=1, data="0054") # Accept
                 print("[VIN] Unsubscribed from VIN updates.")
-            else:
-                resp = build_message(4, rev=1, data="005407")  # Error: Not subscribed
+            else: resp = build_message(4, rev=1, data="005407") # Error: Not subscribed
             self.send_to_client(resp)
             return
 
-        elif mid_int == 60:  # MID 0060 Last tightening result data subscribe
+        elif mid_int == 60: # MID 0060 Last tightening result data subscribe
             no_ack_flag = msg[11:12].decode('ascii')
             req_rev = int(rev) if rev.strip() else 1
-            if req_rev > 1:
-                resp = build_message(4, rev=1, data="006097")  # Error: Revision
-            elif self.result_subscribed:
-                resp = build_message(4, rev=1, data="006009")  # Error: Subscribed
+            if req_rev > 1: resp = build_message(4, rev=1, data="006097") # Error: Revision
+            elif self.result_subscribed: resp = build_message(4, rev=1, data="006009") # Error: Subscribed
             else:
-                self.result_subscribed = True;
-                self.result_no_ack = (no_ack_flag == "1")
-                resp = build_message(5, rev=1, data="0060")  # Accept
+                self.result_subscribed = True; self.result_no_ack = (no_ack_flag == "1")
+                resp = build_message(5, rev=1, data="0060") # Accept
                 print("[Tightening] Result subscription accepted.")
             self.send_to_client(resp)
             return
 
-        elif mid_int == 62:
-            print("[Tightening] Tightening result acknowledged by client (MID 0062).")
+        elif mid_int == 62: print("[Tightening] Tightening result acknowledged by client (MID 0062).")
 
-        elif mid_int == 63:  # MID 0063 Last tightening result unsubscribe
+        elif mid_int == 63: # MID 0063 Last tightening result unsubscribe
             if self.result_subscribed:
-                self.result_subscribed = False;
-                resp = build_message(5, rev=1, data="0063")  # Accept
+                self.result_subscribed = False; resp = build_message(5, rev=1, data="0063") # Accept
                 print("[Tightening] Unsubscribed from tightening results.")
-            else:
-                resp = build_message(4, rev=1, data="006310")  # Error: Not subscribed
+            else: resp = build_message(4, rev=1, data="006310") # Error: Not subscribed
             self.send_to_client(resp)
             return
 
-        else:  # Unsupported MID
-            err_data = f"{mid}{'99'}";
-            resp = build_message(4, rev=1, data=err_data)
+        else: # Unsupported MID
+            err_data = f"{mid}{'99'}"; resp = build_message(4, rev=1, data=err_data)
             self.send_to_client(resp)
             print(f"[Unknown] Received unsupported MID {mid}. Sent error.")
             return
         # --- End MID Dispatch Logic ---
+
 
     def send_single_tightening_result(self):
         """Generate and send a single simulated MID 0061 tightening result (Rev 1)."""
@@ -435,53 +383,40 @@ class OpenProtocolEmulator:
         pset_change_ts = (self.pset_last_change.strftime("%Y-%m-%d:%H:%M:%S")
                           if self.pset_last_change else timestamp_str)
 
-        target_torque = 50.00;
-        torque_min = 47.00;
-        torque_max = 53.00
-        target_angle = 90;
-        angle_min = 80;
-        angle_max = 100
+        target_torque = 50.00; torque_min = 47.00; torque_max = 53.00
+        target_angle = 90; angle_min = 80; angle_max = 100
 
         is_nok = random.random() < self.nok_probability
         status = "0" if is_nok else "1"
-        torque_status = "1";
-        angle_status = "1"
+        torque_status = "1"; angle_status = "1"
         actual_torque = random.uniform(torque_min, torque_max)
         actual_angle = random.uniform(angle_min, angle_max)
 
         if is_nok:
             if random.choice(["torque", "angle"]) == "torque":
                 torque_status = random.choice(["0", "2"])
-                actual_torque = random.uniform(torque_min - 5,
-                                               torque_min - 0.1) if torque_status == "0" else random.uniform(
-                    torque_max + 0.1, torque_max + 5)
+                actual_torque = random.uniform(torque_min - 5, torque_min - 0.1) if torque_status == "0" else random.uniform(torque_max + 0.1, torque_max + 5)
             else:
                 angle_status = random.choice(["0", "2"])
-                actual_angle = random.uniform(angle_min - 20,
-                                              angle_min - 1) if angle_status == "0" else random.uniform(
-                    angle_max + 1, angle_max + 20)
+                actual_angle = random.uniform(angle_min - 20, angle_min - 1) if angle_status == "0" else random.uniform(angle_max + 1, angle_max + 20)
 
         batch_completed = False
         if status == "1" and self.target_batch_size > 0:
             self.batch_counter += 1
             print(f"[Batch] Counter incremented to {self.batch_counter}/{self.target_batch_size}")
 
-        if self.target_batch_size == 0:
-            batch_status = "0"
-        elif self.batch_counter < self.target_batch_size:
-            batch_status = "0"
-        else:
-            batch_status = "1";
-            batch_completed = True
+        if self.target_batch_size == 0: batch_status = "0"
+        elif self.batch_counter < self.target_batch_size: batch_status = "0"
+        else: batch_status = "1"; batch_completed = True
 
         params = {
-            "01": f"{1:04d}", "02": f"{1:02d}", "03": self.controller_name,  # Use configured name
+            "01": f"{1:04d}", "02": f"{1:02d}", "03": self.controller_name, # Use configured name
             "04": self.current_vin.ljust(25), "05": f"{0:02d}",
             "06": (self.current_pset if self.current_pset else "0").rjust(3, '0'),
             "07": f"{self.target_batch_size:04d}", "08": f"{self.batch_counter:04d}",
             "09": status, "10": torque_status, "11": angle_status,
-            "12": f"{int(torque_min * 100):06d}", "13": f"{int(torque_max * 100):06d}",
-            "14": f"{int(target_torque * 100):06d}", "15": f"{int(actual_torque * 100):06d}",
+            "12": f"{int(torque_min*100):06d}", "13": f"{int(torque_max*100):06d}",
+            "14": f"{int(target_torque*100):06d}", "15": f"{int(actual_torque*100):06d}",
             "16": f"{int(angle_min):05d}", "17": f"{int(angle_max):05d}",
             "18": f"{int(target_angle):05d}", "19": f"{int(actual_angle):05d}",
             "20": timestamp_str, "21": pset_change_ts, "22": batch_status,
@@ -491,31 +426,27 @@ class OpenProtocolEmulator:
 
         result_msg = build_message(61, rev=1, data=data, no_ack=self.result_no_ack)
         self.send_to_client(result_msg)
-        print(
-            f"[Tightening] Sent result (MID 0061, ID: {tightening_id_str}). Status: {'OK' if status == '1' else 'NOK'}, Batch: {self.batch_counter}/{self.target_batch_size}")
+        print(f"[Tightening] Sent result (MID 0061, ID: {tightening_id_str}). Status: {'OK' if status == '1' else 'NOK'}, Batch: {self.batch_counter}/{self.target_batch_size}")
 
         if batch_completed:
             print("[Batch] Batch complete!")
-            self._increment_vin();
-            self.batch_counter = 0
+            self._increment_vin(); self.batch_counter = 0
             print("[Batch] VIN incremented and counter reset.")
+
 
     def send_tightening_results_loop(self):
         """Periodically send a simulated MID 0061 tightening result."""
         while self.session_active:
             for _ in range(30):
-                if not self.session_active:
-                    print("[Auto Loop] Session ended.");
-                    return
+                if not self.session_active: print("[Auto Loop] Session ended."); return
                 time.sleep(1)
 
             # Check if loop is active AND tool is enabled by protocol
             if self.session_active and self.result_subscribed and self.auto_send_loop_active:
-                # The check for self.tool_enabled is now inside send_single_tightening_result
-                self.send_single_tightening_result()
-            elif not self.session_active:
-                print("[Auto Loop] Session ended during wait.");
-                return
+                 # The check for self.tool_enabled is now inside send_single_tightening_result
+                 self.send_single_tightening_result()
+            elif not self.session_active: print("[Auto Loop] Session ended during wait."); return
+
 
     def start_gui(self):
         """Start a simple Tkinter GUI with VIN, Batch, and Tool controls."""
@@ -542,36 +473,27 @@ class OpenProtocolEmulator:
                 new_vin = vin_var.get()
                 if new_vin != self.current_vin:
                     if self._parse_vin(new_vin):
-                        self.current_vin = new_vin;
-                        self.batch_counter = 0
+                        self.current_vin = new_vin; self.batch_counter = 0
                         print(f"[GUI Apply] VIN set to {self.current_vin}, batch counter reset.")
-                    else:
-                        messagebox.showerror("Error", f"Invalid VIN format: {new_vin}");
-                        vin_var.set(self.current_vin)
+                    else: messagebox.showerror("Error", f"Invalid VIN format: {new_vin}"); vin_var.set(self.current_vin)
 
                 new_batch_size = int(batch_size_var.get())
                 if new_batch_size >= 0:
                     if new_batch_size != self.target_batch_size:
-                        self.target_batch_size = new_batch_size;
-                        self.batch_counter = 0
-                        print(f"[GUI Apply] Batch Size set to {self.target_batch_size}, batch counter reset.")
-                else:
-                    messagebox.showerror("Error", "Batch Size must be >= 0");
-                    batch_size_var.set(str(self.target_batch_size))
+                         self.target_batch_size = new_batch_size; self.batch_counter = 0
+                         print(f"[GUI Apply] Batch Size set to {self.target_batch_size}, batch counter reset.")
+                else: messagebox.showerror("Error", "Batch Size must be >= 0"); batch_size_var.set(str(self.target_batch_size))
 
                 new_nok_prob_pct = int(nok_prob_var.get())
                 if 0 <= new_nok_prob_pct <= 100:
                     self.nok_probability = new_nok_prob_pct / 100.0
                     print(f"[GUI Apply] NOK Probability set to {self.nok_probability:.2f}")
-                else:
-                    messagebox.showerror("Error", "NOK % must be 0-100");
-                    nok_prob_var.set(str(int(self.nok_probability * 100)))
+                else: messagebox.showerror("Error", "NOK % must be 0-100"); nok_prob_var.set(str(int(self.nok_probability * 100)))
 
                 update_labels()
             except ValueError:
                 messagebox.showerror("Error", "Invalid number format for Batch Size or NOK %.")
-                batch_size_var.set(str(self.target_batch_size));
-                nok_prob_var.set(str(int(self.nok_probability * 100)))
+                batch_size_var.set(str(self.target_batch_size)); nok_prob_var.set(str(int(self.nok_probability * 100)))
 
         def toggle_auto_send_loop():
             self.auto_send_loop_active = not self.auto_send_loop_active
@@ -589,44 +511,28 @@ class OpenProtocolEmulator:
             batch_display_var.set(f"Batch: {self.batch_counter}/{self.target_batch_size}")
             vin_display_var.set(f"VIN: {self.current_vin}")
             tool_protocol_status_var.set("Tool Status: " + ("Enabled" if self.tool_enabled else "Disabled"))
-            try:
-                root.after(1000, update_labels)
-            except tk.TclError:
-                pass
-
+            try: root.after(1000, update_labels)
+            except tk.TclError: pass
         # --- End GUI Callbacks ---
 
         # --- GUI Layout ---
         settings_frame = tk.LabelFrame(root, text="Settings", padx=5, pady=5)
         settings_frame.pack(padx=10, pady=5, fill=tk.X)
-        tk.Label(settings_frame, text="Initial VIN:").grid(row=0, column=0, sticky=tk.W, padx=2,
-                                                         pady=2)
-        tk.Entry(settings_frame, textvariable=vin_var, width=20).grid(row=0, column=1, sticky=tk.W,
-                                                                    padx=2, pady=2)
-        tk.Label(settings_frame, text="Batch Size:").grid(row=1, column=0, sticky=tk.W, padx=2,
-                                                          pady=2)
-        tk.Entry(settings_frame, textvariable=batch_size_var, width=5).grid(row=1, column=1,
-                                                                          sticky=tk.W, padx=2,
-                                                                          pady=2)
+        tk.Label(settings_frame, text="Initial VIN:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
+        tk.Entry(settings_frame, textvariable=vin_var, width=20).grid(row=0, column=1, sticky=tk.W, padx=2, pady=2)
+        tk.Label(settings_frame, text="Batch Size:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
+        tk.Entry(settings_frame, textvariable=batch_size_var, width=5).grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
         tk.Label(settings_frame, text="NOK %:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
-        tk.Entry(settings_frame, textvariable=nok_prob_var, width=5).grid(row=2, column=1,
-                                                                        sticky=tk.W, padx=2, pady=2)
-        tk.Button(settings_frame, text="Apply Settings", command=apply_settings).grid(row=0,
-                                                                                    column=2,
-                                                                                    rowspan=3,
-                                                                                    padx=10, pady=2,
-                                                                                    sticky=tk.NS)
+        tk.Entry(settings_frame, textvariable=nok_prob_var, width=5).grid(row=2, column=1, sticky=tk.W, padx=2, pady=2)
+        tk.Button(settings_frame, text="Apply Settings", command=apply_settings).grid(row=0, column=2, rowspan=3, padx=10, pady=2, sticky=tk.NS)
 
         control_frame = tk.LabelFrame(root, text="Controls", padx=5, pady=5)
         control_frame.pack(padx=10, pady=5, fill=tk.X)
-        toggle_loop_btn = tk.Button(control_frame, text="Toggle Auto Loop",
-                                    command=toggle_auto_send_loop)
+        toggle_loop_btn = tk.Button(control_frame, text="Toggle Auto Loop", command=toggle_auto_send_loop)
         toggle_loop_btn.pack(side=tk.LEFT, padx=5)
-        auto_send_label = tk.Label(control_frame, textvariable=auto_send_loop_status_var,
-                                   relief=tk.SUNKEN, width=10)
+        auto_send_label = tk.Label(control_frame, textvariable=auto_send_loop_status_var, relief=tk.SUNKEN, width=10)
         auto_send_label.pack(side=tk.LEFT, padx=5)
-        tk.Button(control_frame, text="Send Single Result", command=manual_send_result).pack(
-            side=tk.LEFT, padx=10)
+        tk.Button(control_frame, text="Send Single Result", command=manual_send_result).pack(side=tk.LEFT, padx=10)
 
         status_frame = tk.LabelFrame(root, text="Status", padx=5, pady=5)
         status_frame.pack(padx=10, pady=10, fill=tk.X)
@@ -639,7 +545,6 @@ class OpenProtocolEmulator:
 
         update_labels()
         root.mainloop()
-
 
 # Main entry point
 if __name__ == "__main__":
@@ -659,11 +564,11 @@ if __name__ == "__main__":
     # Start GUI only if server thread started successfully (basic check)
     if server_thread.is_alive():
         try:
-            emulator.start_gui()  # Runs in main thread
+            emulator.start_gui() # Runs in main thread
         except tk.TclError as e:
-            print(f"[GUI Error] Failed to start Tkinter GUI: {e}")
-            print("Ensure a display environment is available.")
+             print(f"[GUI Error] Failed to start Tkinter GUI: {e}")
+             print("Ensure a display environment is available.")
         except Exception as e:
-            print(f"[GUI Error] Unexpected error starting GUI: {e}")
+             print(f"[GUI Error] Unexpected error starting GUI: {e}")
     else:
         print("[Error] Server thread failed to start. Exiting.")
