@@ -1,0 +1,370 @@
+[
+    {
+        "id": "f6f2187d.f17ca8",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "60beb4c857e51d6d",
+        "type": "op config",
+        "name": "Emulator",
+        "controllerIP": "192.168.0.14",
+        "controllerPort": 4545,
+        "keepAlive": 10000,
+        "timeout": "3000",
+        "retries": 3,
+        "disablemidparsing": "",
+        "rawData": false,
+        "generic": false,
+        "linkLayer": "auto"
+    },
+    {
+        "id": "3cc11d24.ff01a2",
+        "type": "comment",
+        "z": "f6f2187d.f17ca8",
+        "name": "WARNING: please check you have started this container with a volume that is mounted to /data\\n otherwise any flow changes are lost when you redeploy or upgrade the container\\n (e.g. upgrade to a more recent node-red docker image).\\n  If you are using named volumes you can ignore this warning.\\n Double click or see info side panel to learn how to start Node-RED in Docker to save your work",
+        "info": "\nTo start docker with a bind mount volume (-v option), for example:\n\n```\ndocker run -it -p 1880:1880 -v /home/user/node_red_data:/data --name mynodered nodered/node-red\n```\n\nwhere `/home/user/node_red_data` is a directory on your host machine where you want to store your flows.\n\nIf you do not do this then you can experiment and redploy flows, but if you restart or upgrade the container the flows will be disconnected and lost. \n\nThey will still exist in a hidden data volume, which can be recovered using standard docker techniques, but that is much more complex than just starting with a named volume as described above.",
+        "x": 350,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "a72aa20c6b01d550",
+        "type": "inject",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 220,
+        "wires": [
+            [
+                "63d8eb1e23e9a60b"
+            ]
+        ]
+    },
+    {
+        "id": "06da62ecc91e4c29",
+        "type": "op node",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "config": "60beb4c857e51d6d",
+        "midGroup": "18",
+        "customMid": "",
+        "revision": "1",
+        "customRevision": "",
+        "autoSubscribe": true,
+        "forwardErrors": false,
+        "outputs": 1,
+        "x": 520,
+        "y": 220,
+        "wires": [
+            [
+                "4b6898b9e5a5d879"
+            ]
+        ]
+    },
+    {
+        "id": "63d8eb1e23e9a60b",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "function 1",
+        "func": "msg.payload = {}\nmsg.payload.parameterSetID = 101;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 320,
+        "y": 220,
+        "wires": [
+            [
+                "06da62ecc91e4c29"
+            ]
+        ]
+    },
+    {
+        "id": "4b6898b9e5a5d879",
+        "type": "debug",
+        "z": "f6f2187d.f17ca8",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 720,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "52d105884ec47644",
+        "type": "op node",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "config": "60beb4c857e51d6d",
+        "midGroup": "61",
+        "customMid": "",
+        "revision": "Auto",
+        "customRevision": "",
+        "autoSubscribe": true,
+        "forwardErrors": false,
+        "outputs": 2,
+        "x": 370,
+        "y": 340,
+        "wires": [
+            [
+                "cc7a525da02dc475"
+            ],
+            [
+                "48b1433f602ad5d3"
+            ]
+        ]
+    },
+    {
+        "id": "979b7ccd4f8704a3",
+        "type": "inject",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 340,
+        "wires": [
+            [
+                "52d105884ec47644"
+            ]
+        ]
+    },
+    {
+        "id": "cc7a525da02dc475",
+        "type": "debug",
+        "z": "f6f2187d.f17ca8",
+        "name": "debug 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 550,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "48b1433f602ad5d3",
+        "type": "debug",
+        "z": "f6f2187d.f17ca8",
+        "name": "debug 3",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 560,
+        "y": 380,
+        "wires": []
+    },
+    {
+        "id": "f8c24a5b0850be5d",
+        "type": "catch",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "scope": null,
+        "uncaught": false,
+        "x": 160,
+        "y": 480,
+        "wires": [
+            [
+                "4b76a4384a5fec8d"
+            ]
+        ]
+    },
+    {
+        "id": "4b76a4384a5fec8d",
+        "type": "debug",
+        "z": "f6f2187d.f17ca8",
+        "name": "debug 4",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 320,
+        "y": 480,
+        "wires": []
+    },
+    {
+        "id": "d5070ac789f42f52",
+        "type": "op node",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "config": "60beb4c857e51d6d",
+        "midGroup": "42",
+        "customMid": "",
+        "revision": "1",
+        "customRevision": "",
+        "autoSubscribe": true,
+        "forwardErrors": true,
+        "outputs": 1,
+        "x": 360,
+        "y": 580,
+        "wires": [
+            [
+                "98be36da6445ec52"
+            ]
+        ]
+    },
+    {
+        "id": "4135f8d7b984694b",
+        "type": "inject",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 580,
+        "wires": [
+            [
+                "d5070ac789f42f52"
+            ]
+        ]
+    },
+    {
+        "id": "91f7f0666a0bef8e",
+        "type": "op node",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "config": "60beb4c857e51d6d",
+        "midGroup": "43",
+        "customMid": "",
+        "revision": "1",
+        "customRevision": "",
+        "autoSubscribe": true,
+        "forwardErrors": true,
+        "outputs": 1,
+        "x": 360,
+        "y": 640,
+        "wires": [
+            [
+                "8f784f36f270efd9"
+            ]
+        ]
+    },
+    {
+        "id": "243d03fbefe05ac7",
+        "type": "inject",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 640,
+        "wires": [
+            [
+                "91f7f0666a0bef8e"
+            ]
+        ]
+    },
+    {
+        "id": "98be36da6445ec52",
+        "type": "debug",
+        "z": "f6f2187d.f17ca8",
+        "name": "debug 5",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 550,
+        "y": 580,
+        "wires": []
+    },
+    {
+        "id": "8f784f36f270efd9",
+        "type": "debug",
+        "z": "f6f2187d.f17ca8",
+        "name": "debug 6",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 540,
+        "y": 640,
+        "wires": []
+    }
+]

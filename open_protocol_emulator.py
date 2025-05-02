@@ -42,7 +42,11 @@ class OpenProtocolEmulator:
         # State variables
         self.session_active = False
         self.current_pset = None
-        self.available_psets = {"001", "002", "003", "004", "005"}
+        self.available_psets = {"001", "002", "003", "004", "005",
+                                "010", "011", "012", "013", "014", "015", 
+                                "050", "051", "052", "053", "054", "055", 
+                                "100", "101", "102", "103", "104", "105"}
+        self.current_pset = None
         # --- VIN and Batch State ---
         self.current_vin = "AB123000"
         self.vin_prefix = "AB123"
@@ -58,6 +62,7 @@ class OpenProtocolEmulator:
         self.result_no_ack = False
         self.tool_enabled = True # Protocol state
         self.auto_send_loop_active = True # GUI state
+        self.auto_loop_interval = 20 # Default auto loop interval in seconds
         self.pset_last_change = None
         self.pset_subscribed = False
         self.client_socket = None
@@ -437,7 +442,8 @@ class OpenProtocolEmulator:
     def send_tightening_results_loop(self):
         """Periodically send a simulated MID 0061 tightening result."""
         while self.session_active:
-            for _ in range(30):
+            # Use the configurable interval
+            for _ in range(self.auto_loop_interval):
                 if not self.session_active: print("[Auto Loop] Session ended."); return
                 time.sleep(1)
 
@@ -451,7 +457,7 @@ class OpenProtocolEmulator:
     def start_gui(self):
         """Start a simple Tkinter GUI with VIN, Batch, and Tool controls."""
         # Use configured name and port in title
-        window_title = f"{self.controller_name.strip()} Sim (Port: {self.port})"
+        window_title = f"{self.controller_name.strip()} (Port: {self.port})"
         root = tk.Tk()
         root.title(window_title)
 
@@ -459,6 +465,7 @@ class OpenProtocolEmulator:
         vin_var = tk.StringVar(value=self.current_vin)
         batch_size_var = tk.StringVar(value=str(self.target_batch_size))
         nok_prob_var = tk.StringVar(value=str(int(self.nok_probability * 100)))
+        auto_loop_interval_var = tk.StringVar(value=str(self.auto_loop_interval)) # New variable for interval
         auto_send_loop_status_var = tk.StringVar(value="Active")
         pset_display_var = tk.StringVar(value="Pset: Not set")
         conn_display_var = tk.StringVar(value="Status: Disconnected")
@@ -490,10 +497,17 @@ class OpenProtocolEmulator:
                     print(f"[GUI Apply] NOK Probability set to {self.nok_probability:.2f}")
                 else: messagebox.showerror("Error", "NOK % must be 0-100"); nok_prob_var.set(str(int(self.nok_probability * 100)))
 
+                new_interval = int(auto_loop_interval_var.get()) # Read new interval
+                if new_interval > 0:
+                    self.auto_loop_interval = new_interval
+                    print(f"[GUI Apply] Auto Loop Interval set to {self.auto_loop_interval} seconds.")
+                else: messagebox.showerror("Error", "Interval must be > 0"); auto_loop_interval_var.set(str(self.auto_loop_interval))
+
                 update_labels()
             except ValueError:
-                messagebox.showerror("Error", "Invalid number format for Batch Size or NOK %.")
+                messagebox.showerror("Error", "Invalid number format for Batch Size, NOK %, or Interval.")
                 batch_size_var.set(str(self.target_batch_size)); nok_prob_var.set(str(int(self.nok_probability * 100)))
+                auto_loop_interval_var.set(str(self.auto_loop_interval))
 
         def toggle_auto_send_loop():
             self.auto_send_loop_active = not self.auto_send_loop_active
@@ -524,7 +538,9 @@ class OpenProtocolEmulator:
         tk.Entry(settings_frame, textvariable=batch_size_var, width=5).grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
         tk.Label(settings_frame, text="NOK %:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
         tk.Entry(settings_frame, textvariable=nok_prob_var, width=5).grid(row=2, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Button(settings_frame, text="Apply Settings", command=apply_settings).grid(row=0, column=2, rowspan=3, padx=10, pady=2, sticky=tk.NS)
+        tk.Label(settings_frame, text="Auto Loop Interval (s):").grid(row=3, column=0, sticky=tk.W, padx=2, pady=2) # New label
+        tk.Entry(settings_frame, textvariable=auto_loop_interval_var, width=5).grid(row=3, column=1, sticky=tk.W, pady=2) # New entry
+        tk.Button(settings_frame, text="Apply Settings", command=apply_settings).grid(row=0, column=2, rowspan=4, padx=10, pady=2, sticky=tk.NS) # Adjusted rowspan
 
         control_frame = tk.LabelFrame(root, text="Controls", padx=5, pady=5)
         control_frame.pack(padx=10, pady=5, fill=tk.X)
