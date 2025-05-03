@@ -96,6 +96,21 @@ Example:
 python open_protocol_emulator.py --port 5000 --name MyEmulator
 ```
 
+### Running with Docker
+
+To run Node-RED with the `node-red-contrib-open-protocol` node pre-installed using Docker Compose:
+
+1.  Ensure you have Docker and Docker Compose installed.
+2.  Build the Docker image (this will install the Node-RED node):
+    ```bash
+    docker compose build
+    ```
+3.  Run the containers:
+    ```bash
+    docker compose up -d
+    ```
+    This will start the Node-RED container in detached mode. Node-RED will be accessible at `http://localhost:1880`. The emulator is expected to be running separately on the host machine, listening on port 4545 (or other configured ports).
+
 ## Contributing
 
 Feel free to help out with the implementation of additional MIDs or other features.

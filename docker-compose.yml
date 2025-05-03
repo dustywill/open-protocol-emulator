@@ -8,7 +8,9 @@ version: "3.7"
 
 services:
   node-red:
-    image: nodered/node-red:latest
+    build: .
+    container_name: node-red
+    image: local-nodered-custom
     environment:
       - TZ=Europe/Amsterdam
     ports:
@@ -31,7 +33,7 @@ services:
     volumes:
       - node-red-data:/data
     # Install node-red-contrib-open-protocol
-    command: sh -c "npm install node-red-contrib-open-protocol && npm start"
+    command: sh -c "cd /data && npm install node-red-contrib-open-protocol && npm start"
 
 volumes:
   node-red-data:
