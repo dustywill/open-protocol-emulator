@@ -14,10 +14,24 @@ services:
     ports:
       - "1880:1880"
       - "4545:4545"
+      # Forward ports 5000 to 5010 for multiple instances
+      - "5000:5000"
+      - "5001:5001"
+      - "5002:5002"
+      - "5003:5003"
+      - "5004:5004"
+      - "5005:5005"
+      - "5006:5006"
+      - "5007:5007"
+      - "5008:5008"
+      - "5009:5009"
+      - "5010:5010"
     networks:
       - node-red-net
     volumes:
       - node-red-data:/data
+    # Install node-red-contrib-open-protocol
+    command: sh -c "npm install node-red-contrib-open-protocol && npm start"
 
 volumes:
   node-red-data:
