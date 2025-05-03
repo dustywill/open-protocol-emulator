@@ -69,9 +69,88 @@ class OpenProtocolEmulator:
         self.send_lock = threading.Lock()
         self.tightening_id_counter = 0
 
+        # --- Pset Parameters Storage ---
+        self.pset_parameters = {}
+        self._load_pset_parameters(self.controller_name) # Attempt to load from file using controller name
+        # --- End Pset Parameters Storage ---
+
         self._parse_vin(self.current_vin)
 
+    def _initialize_default_pset_parameters(self):
+        """Initializes default parameters for available Psets."""
+        default_params = {
+            "batch_size": 5,
+            "target_torque": 50.00,
+            "torque_min": 47.00,
+            "torque_max": 53.00,
+            "target_angle": 90,
+            "angle_min": 80,
+            "angle_max": 100,
+        }
+        for pset_id in self.available_psets:
+            if pset_id not in self.pset_parameters: # Only initialize if not loaded from file
+                self.pset_parameters[pset_id] = default_params.copy()
+        print("[Pset Params] Initialized default Pset parameters for new Psets.")
+
+
+    def _get_pset_filename(self, controller_name):
+        """Generates the filename for Pset parameters based on controller name."""
+        # Sanitize the controller name to be safe for filenames
+        safe_name = re.sub(r'[^\w.-]', '_', controller_name)
+        return f"pset_parameters_{safe_name}.json"
+
+
+    def _load_pset_parameters(self, controller_name):
+        """Loads Pset parameters from a JSON file based on controller name."""
+        import json
+        filename = self._get_pset_filename(controller_name)
+        try:
+            with open(filename, 'r') as f:
+                self.pset_parameters = json.load(f)
+            print(f"[Pset Params] Loaded parameters from {filename}")
+            # Ensure all available_psets are in the loaded parameters, add defaults if missing
+            self._initialize_default_pset_parameters()
+        except FileNotFoundError:
+            print(f"[Pset Params] No parameter file found ({filename}). Initializing defaults.")
+            self._initialize_default_pset_parameters()
+        except json.JSONDecodeError:
+            print(f"[Pset Params] Error decoding JSON from {filename}. Initializing defaults.")
+            self._initialize_default_pset_parameters()
+        except Exception as e:
+            print(f"[Pset Params] Unexpected error loading parameters: {e}. Initializing defaults.")
+            self._initialize_default_pset_parameters()
+
+
+    def _save_pset_parameters(self, controller_name):
+        """Saves current Pset parameters to a JSON file based on controller name."""
+        import json
+        filename = self._get_pset_filename(controller_name)
+        try:
+            with open(filename, 'w') as f:
+                json.dump(self.pset_parameters, f, indent=4)
+            print(f"[Pset Params] Saved parameters to {filename}")
+        except Exception as e:
+            print(f"[Pset Params] Error saving parameters to {filename}: {e}")
+
+
     def _parse_vin(self, vin_string):
+        """Parses VIN into prefix and numeric parts."""
+        match = re.match(r'^(.*?)(\d+)$', vin_string)
+        if match:
+            self.vin_prefix = match.group(1)
+            self.vin_numeric_str = match.group(2)
+            self.vin_padding = len(self.vin_numeric_str)
+            print(f"[VIN Parse] Parsed: Prefix='{self.vin_prefix}', Numeric='{self.vin_numeric_str}', Padding={self.vin_padding}")
+            return True
+        else:
+            print(f"[VIN Parse] Error: Could not parse VIN '{vin_string}'. Using defaults.")
+            self.vin_prefix = vin_string
+            self.vin_numeric_str = "0"
+            self.vin_padding = 1
+            self.current_vin = vin_string + "0"
+            return False
+
+    def _increment_vin(self):
         """Parses VIN into prefix and numeric parts."""
         match = re.match(r'^(.*?)(\d+)$', vin_string)
         if match:
@@ -388,8 +467,30 @@ class OpenProtocolEmulator:
         pset_change_ts = (self.pset_last_change.strftime("%Y-%m-%d:%H:%M:%S")
                           if self.pset_last_change else timestamp_str)
 
-        target_torque = 50.00; torque_min = 47.00; torque_max = 53.00
-        target_angle = 90; angle_min = 80; angle_max = 100
+        # --- Get Pset Parameters ---
+        current_pset_params = self.pset_parameters.get(self.current_pset)
+
+        if current_pset_params:
+            target_torque = current_pset_params["target_torque"]
+            torque_min = current_pset_params["torque_min"]
+            torque_max = current_pset_params["torque_max"]
+            target_angle = current_pset_params["target_angle"]
+            angle_min = current_pset_params["angle_min"]
+            angle_max = current_pset_params["angle_max"]
+            current_target_batch_size = current_pset_params["batch_size"]
+            print(f"[Tightening] Using parameters from Pset {self.current_pset}")
+        else:
+            # Fallback to global defaults if no Pset selected or params not found
+            target_torque = 50.00
+            torque_min = 47.00
+            torque_max = 53.00
+            target_angle = 90
+            angle_min = 80
+            angle_max = 100
+            current_target_batch_size = self.target_batch_size # Use global batch size as fallback
+            print("[Tightening] Using global default parameters.")
+        # --- End Get Pset Parameters ---
+
 
         is_nok = random.random() < self.nok_probability
         status = "0" if is_nok else "1"
@@ -397,28 +498,33 @@ class OpenProtocolEmulator:
         actual_torque = random.uniform(torque_min, torque_max)
         actual_angle = random.uniform(angle_min, angle_max)
 
+        # Adjust actual values if NOK to simulate failure outside limits
         if is_nok:
             if random.choice(["torque", "angle"]) == "torque":
-                torque_status = random.choice(["0", "2"])
+                torque_status = random.choice(["0", "2"]) # 0: Low, 2: High
                 actual_torque = random.uniform(torque_min - 5, torque_min - 0.1) if torque_status == "0" else random.uniform(torque_max + 0.1, torque_max + 5)
             else:
-                angle_status = random.choice(["0", "2"])
+                angle_status = random.choice(["0", "2"]) # 0: Low, 2: High
                 actual_angle = random.uniform(angle_min - 20, angle_min - 1) if angle_status == "0" else random.uniform(angle_max + 1, angle_max + 20)
 
-        batch_completed = False
-        if status == "1" and self.target_batch_size > 0:
-            self.batch_counter += 1
-            print(f"[Batch] Counter incremented to {self.batch_counter}/{self.target_batch_size}")
 
-        if self.target_batch_size == 0: batch_status = "0"
-        elif self.batch_counter < self.target_batch_size: batch_status = "0"
+        batch_completed = False
+        # Use the current_target_batch_size derived from Pset or global
+        if status == "1" and current_target_batch_size > 0:
+            self.batch_counter += 1
+            print(f"[Batch] Counter incremented to {self.batch_counter}/{current_target_batch_size}")
+
+        # Use the current_target_batch_size for batch status check
+        if current_target_batch_size == 0: batch_status = "0"
+        elif self.batch_counter < current_target_batch_size: batch_status = "0"
         else: batch_status = "1"; batch_completed = True
 
         params = {
             "01": f"{1:04d}", "02": f"{1:02d}", "03": self.controller_name, # Use configured name
             "04": self.current_vin.ljust(25), "05": f"{0:02d}",
             "06": (self.current_pset if self.current_pset else "0").rjust(3, '0'),
-            "07": f"{self.target_batch_size:04d}", "08": f"{self.batch_counter:04d}",
+            "07": f"{current_target_batch_size:04d}", # Use current_target_batch_size
+            "08": f"{self.batch_counter:04d}",
             "09": status, "10": torque_status, "11": angle_status,
             "12": f"{int(torque_min*100):06d}", "13": f"{int(torque_max*100):06d}",
             "14": f"{int(target_torque*100):06d}", "15": f"{int(actual_torque*100):06d}",
@@ -431,7 +537,8 @@ class OpenProtocolEmulator:
 
         result_msg = build_message(61, rev=1, data=data, no_ack=self.result_no_ack)
         self.send_to_client(result_msg)
-        print(f"[Tightening] Sent result (MID 0061, ID: {tightening_id_str}). Status: {'OK' if status == '1' else 'NOK'}, Batch: {self.batch_counter}/{self.target_batch_size}")
+        # Update print statement to show the batch size being used
+        print(f"[Tightening] Sent result (MID 0061, ID: {tightening_id_str}). Status: {'OK' if status == '1' else 'NOK'}, Batch: {self.batch_counter}/{current_target_batch_size}")
 
         if batch_completed:
             print("[Batch] Batch complete!")
@@ -474,8 +581,20 @@ class OpenProtocolEmulator:
         tool_protocol_status_var = tk.StringVar(value="Tool Status: Enabled")
         # --- End GUI Variables ---
 
+        # --- Pset GUI Variables ---
+        pset_id_var = tk.StringVar(value=list(self.available_psets)[0] if self.available_psets else "")
+        pset_batch_size_var = tk.StringVar(value="")
+        pset_target_torque_var = tk.StringVar(value="")
+        pset_torque_min_var = tk.StringVar(value="")
+        pset_torque_max_var = tk.StringVar(value="")
+        pset_target_angle_var = tk.StringVar(value="")
+        pset_angle_min_var = tk.StringVar(value="")
+        pset_angle_max_var = tk.StringVar(value="")
+        # --- End Pset GUI Variables ---
+
+
         # --- GUI Callbacks ---
-        def apply_settings():
+        def apply_global_settings():
             try:
                 new_vin = vin_var.get()
                 if new_vin != self.current_vin:
@@ -484,12 +603,13 @@ class OpenProtocolEmulator:
                         print(f"[GUI Apply] VIN set to {self.current_vin}, batch counter reset.")
                     else: messagebox.showerror("Error", f"Invalid VIN format: {new_vin}"); vin_var.set(self.current_vin)
 
+                # Global batch size is now less relevant, but keep for fallback or other uses
                 new_batch_size = int(batch_size_var.get())
                 if new_batch_size >= 0:
-                    if new_batch_size != self.target_batch_size:
-                         self.target_batch_size = new_batch_size; self.batch_counter = 0
-                         print(f"[GUI Apply] Batch Size set to {self.target_batch_size}, batch counter reset.")
+                    self.target_batch_size = new_batch_size
+                    print(f"[GUI Apply] Global Batch Size set to {self.target_batch_size}.")
                 else: messagebox.showerror("Error", "Batch Size must be >= 0"); batch_size_var.set(str(self.target_batch_size))
+
 
                 new_nok_prob_pct = int(nok_prob_var.get())
                 if 0 <= new_nok_prob_pct <= 100:
@@ -509,6 +629,62 @@ class OpenProtocolEmulator:
                 batch_size_var.set(str(self.target_batch_size)); nok_prob_var.set(str(int(self.nok_probability * 100)))
                 auto_loop_interval_var.set(str(self.auto_loop_interval))
 
+        def load_pset_settings():
+            selected_pset = pset_id_var.get()
+            if selected_pset in self.pset_parameters:
+                params = self.pset_parameters[selected_pset]
+                pset_batch_size_var.set(str(params["batch_size"]))
+                pset_target_torque_var.set(str(params["target_torque"]))
+                pset_torque_min_var.set(str(params["torque_min"]))
+                pset_torque_max_var.set(str(params["torque_max"]))
+                pset_target_angle_var.set(str(params["target_angle"]))
+                pset_angle_min_var.set(str(params["angle_min"]))
+                pset_angle_max_var.set(str(params["angle_max"]))
+                print(f"[GUI] Loaded settings for Pset {selected_pset}")
+            else:
+                messagebox.showwarning("Warning", f"Pset {selected_pset} not found or no parameters initialized.")
+                # Clear fields if Pset not found
+                pset_batch_size_var.set("")
+                pset_target_torque_var.set("")
+                pset_torque_min_var.set("")
+                pset_torque_max_var.set("")
+                pset_target_angle_var.set("")
+                pset_angle_min_var.set("")
+                pset_angle_max_var.set("")
+
+
+        def apply_pset_settings():
+            selected_pset = pset_id_var.get()
+            if selected_pset not in self.available_psets:
+                 messagebox.showerror("Error", f"Invalid Pset ID: {selected_pset}"); return
+
+            try:
+                new_params = {
+                    "batch_size": int(pset_batch_size_var.get()),
+                    "target_torque": float(pset_target_torque_var.get()),
+                    "torque_min": float(pset_torque_min_var.get()),
+                    "torque_max": float(pset_torque_max_var.get()),
+                    "target_angle": int(pset_target_angle_var.get()),
+                    "angle_min": int(pset_angle_min_var.get()),
+                    "angle_max": int(pset_angle_max_var.get()),
+                }
+                # Basic validation (can add more specific checks)
+                if new_params["batch_size"] < 0: raise ValueError("Batch size must be >= 0")
+                if new_params["torque_min"] > new_params["torque_max"]: raise ValueError("Min Torque > Max Torque")
+                if new_params["angle_min"] > new_params["angle_max"]: raise ValueError("Min Angle > Max Angle")
+
+
+                self.pset_parameters[selected_pset] = new_params
+                print(f"[GUI] Applied settings for Pset {selected_pset}: {new_params}")
+                self._save_pset_parameters(self.controller_name) # Save immediately after applying, passing controller name
+                messagebox.showinfo("Success", f"Settings applied for Pset {selected_pset}")
+
+            except ValueError as e:
+                messagebox.showerror("Error", f"Invalid number format or value: {e}")
+            except Exception as e:
+                messagebox.showerror("Error", f"An unexpected error occurred: {e}")
+
+
         def toggle_auto_send_loop():
             self.auto_send_loop_active = not self.auto_send_loop_active
             new_status = "Active" if self.auto_send_loop_active else "Paused"
@@ -522,7 +698,10 @@ class OpenProtocolEmulator:
         def update_labels():
             pset_display_var.set("Pset: " + (self.current_pset if self.current_pset else "Not set"))
             conn_display_var.set("Status: " + ("Connected" if self.session_active else "Disconnected"))
-            batch_display_var.set(f"Batch: {self.batch_counter}/{self.target_batch_size}")
+            # Display batch counter based on current Pset's target batch size
+            current_target_batch = self.pset_parameters.get(self.current_pset, {}).get("batch_size", self.target_batch_size)
+            batch_display_var.set(f"Batch: {self.batch_counter}/{current_target_batch}")
+
             vin_display_var.set(f"VIN: {self.current_vin}")
             tool_protocol_status_var.set("Tool Status: " + ("Enabled" if self.tool_enabled else "Disabled"))
             try: root.after(1000, update_labels)
@@ -530,17 +709,50 @@ class OpenProtocolEmulator:
         # --- End GUI Callbacks ---
 
         # --- GUI Layout ---
-        settings_frame = tk.LabelFrame(root, text="Settings", padx=5, pady=5)
+        settings_frame = tk.LabelFrame(root, text="Global Settings", padx=5, pady=5)
         settings_frame.pack(padx=10, pady=5, fill=tk.X)
         tk.Label(settings_frame, text="Initial VIN:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
         tk.Entry(settings_frame, textvariable=vin_var, width=20).grid(row=0, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Label(settings_frame, text="Batch Size:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
+        tk.Label(settings_frame, text="Global Batch Size:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2) # Renamed label
         tk.Entry(settings_frame, textvariable=batch_size_var, width=5).grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
         tk.Label(settings_frame, text="NOK %:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
         tk.Entry(settings_frame, textvariable=nok_prob_var, width=5).grid(row=2, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Label(settings_frame, text="Auto Loop Interval (s):").grid(row=3, column=0, sticky=tk.W, padx=2, pady=2) # New label
-        tk.Entry(settings_frame, textvariable=auto_loop_interval_var, width=5).grid(row=3, column=1, sticky=tk.W, pady=2) # New entry
-        tk.Button(settings_frame, text="Apply Settings", command=apply_settings).grid(row=0, column=2, rowspan=4, padx=10, pady=2, sticky=tk.NS) # Adjusted rowspan
+        tk.Label(settings_frame, text="Auto Loop Interval (s):").grid(row=3, column=0, sticky=tk.W, padx=2, pady=2)
+        tk.Entry(settings_frame, textvariable=auto_loop_interval_var, width=5).grid(row=3, column=1, sticky=tk.W, pady=2)
+        tk.Button(settings_frame, text="Apply Global Settings", command=apply_global_settings).grid(row=0, column=2, rowspan=4, padx=10, pady=2, sticky=tk.NS) # Renamed button and command
+
+        # --- Pset Settings Frame ---
+        pset_settings_frame = tk.LabelFrame(root, text="Pset Settings", padx=5, pady=5)
+        pset_settings_frame.pack(padx=10, pady=5, fill=tk.X)
+
+        tk.Label(pset_settings_frame, text="Pset ID:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
+        # Using OptionMenu for Pset selection
+        pset_id_optionmenu = tk.OptionMenu(pset_settings_frame, pset_id_var, *sorted(list(self.available_psets)))
+        pset_id_optionmenu.grid(row=0, column=1, sticky=tk.W, padx=2, pady=2)
+        tk.Button(pset_settings_frame, text="Load Pset Settings", command=load_pset_settings).grid(row=0, column=2, padx=10, pady=2)
+
+
+        tk.Label(pset_settings_frame, text="Batch Size:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
+        tk.Entry(pset_settings_frame, textvariable=pset_batch_size_var, width=5).grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
+
+        tk.Label(pset_settings_frame, text="Target Torque:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
+        tk.Entry(pset_settings_frame, textvariable=pset_target_torque_var, width=8).grid(row=2, column=1, sticky=tk.W, padx=2, pady=2)
+        tk.Label(pset_settings_frame, text="Min Torque:").grid(row=2, column=2, sticky=tk.W, padx=2, pady=2)
+        tk.Entry(pset_settings_frame, textvariable=pset_torque_min_var, width=8).grid(row=2, column=3, sticky=tk.W, padx=2, pady=2)
+        tk.Label(pset_settings_frame, text="Max Torque:").grid(row=2, column=4, sticky=tk.W, padx=2, pady=2)
+        tk.Entry(pset_settings_frame, textvariable=pset_torque_max_var, width=8).grid(row=2, column=5, sticky=tk.W, padx=2, pady=2)
+
+        tk.Label(pset_settings_frame, text="Target Angle:").grid(row=3, column=0, sticky=tk.W, padx=2, pady=2)
+        tk.Entry(pset_settings_frame, textvariable=pset_target_angle_var, width=5).grid(row=3, column=1, sticky=tk.W, padx=2, pady=2)
+        tk.Label(pset_settings_frame, text="Min Angle:").grid(row=3, column=2, sticky=tk.W, padx=2, pady=2)
+        tk.Entry(pset_settings_frame, textvariable=pset_angle_min_var, width=5).grid(row=3, column=3, sticky=tk.W, padx=2, pady=2)
+        tk.Label(pset_settings_frame, text="Max Angle:").grid(row=3, column=4, sticky=tk.W, padx=2, pady=2)
+        tk.Entry(pset_settings_frame, textvariable=pset_angle_max_var, width=5).grid(row=3, column=5, sticky=tk.W, padx=2, pady=2)
+
+        tk.Button(pset_settings_frame, text="Apply Pset Settings", command=apply_pset_settings).grid(row=1, column=6, rowspan=3, padx=10, pady=2, sticky=tk.NS) # Adjusted rowspan and column
+
+        # --- End Pset Settings Frame ---
+
 
         control_frame = tk.LabelFrame(root, text="Controls", padx=5, pady=5)
         control_frame.pack(padx=10, pady=5, fill=tk.X)
@@ -558,6 +770,15 @@ class OpenProtocolEmulator:
         tk.Label(status_frame, textvariable=vin_display_var).pack(anchor=tk.W)
         tk.Label(status_frame, textvariable=batch_display_var).pack(anchor=tk.W)
         # --- End GUI Layout ---
+
+        # Bind the save function to the window closing event
+        root.protocol("WM_DELETE_WINDOW", lambda: (self._save_pset_parameters(self.controller_name), root.destroy()))
+
+        # Bind load_pset_settings to the Pset ID variable trace
+        pset_id_var.trace_add("write", lambda name, index, mode: load_pset_settings())
+
+        # Load initial Pset settings into GUI fields
+        load_pset_settings()
 
         update_labels()
         root.mainloop()
