@@ -1,6 +1,6 @@
-# Open Protocol Emulator
+# Open Protocol (Contoller) Emulator
 
-This project provides a Python-based emulator for an Open Protocol controller, such as an Atlas Copco torque tool. It's designed for testing and development purposes, allowing you to simulate communication with a controller without needing physical hardware. This can be particularly useful for integrating with systems like Node-RED.
+This project provides a Python-based emulator for an Open Protocol controller, such as an Atlas Copco or Panasonic torque tool. It's designed for testing and development purposes, allowing you to simulate communication with a controller without needing physical hardware. This can be particularly useful for integrating with systems like Node-RED.
 
 ## Features
 
