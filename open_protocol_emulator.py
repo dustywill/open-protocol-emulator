@@ -173,6 +173,39 @@ class OpenProtocolEmulator:
         max_rev = max_supported.get(mid, 1)
         return min(requested_rev, max_rev)
 
+    def _build_mid0002_data(self, revision: int) -> str:
+        """Build MID 0002 response data for given revision (1-6)."""
+        fields = []
+
+        fields.append(f"01{1:04d}")
+        fields.append(f"02{1:02d}")
+        fields.append(f"03{self.controller_name}")
+
+        if revision >= 2:
+            fields.append(f"04{self.supplier_code:03d}")
+            fields.append(f"05{self.op_version}")
+            fields.append(f"06{self.ctrl_sw_version}")
+            fields.append(f"07{self.tool_sw_version}")
+
+        if revision >= 3:
+            fields.append(f"08{self.rbu_type}")
+            fields.append(f"09{self.ctrl_serial}")
+
+        if revision >= 4:
+            fields.append(f"10{self.system_type}")
+            fields.append(f"11{self.system_subtype}")
+
+        if revision >= 5:
+            fields.append(f"12{self.seq_num_support:01d}")
+            fields.append(f"13{self.link_support:01d}")
+            fields.append(f"14{self.station_id}")
+            fields.append(f"15{self.station_name}")
+
+        if revision >= 6:
+            fields.append(f"16{self.client_id:01d}")
+
+        return "".join(fields)
+
     # === Communication MID Handlers ===
 
     def _handle_mid_0001(self, mid_int, rev, no_ack_flag, data_field, msg):
@@ -180,16 +213,12 @@ class OpenProtocolEmulator:
             resp = build_message(4, rev=1, data="000196")
         else:
             requested_rev = int(rev) if rev.strip() else 1
-            if requested_rev > 1:
-                resp = build_message(4, rev=1, data="000197")
-            else:
-                cell_id = "0001"
-                channel_id = "01"
-                data = f"01{cell_id}02{channel_id}03{self.controller_name}"
-                resp = build_message(2, rev=1, data=data)
-                self.session_active = True
-                print("[Session] Communication started.")
-                threading.Thread(target=self.send_tightening_results_loop, daemon=True).start()
+            response_rev = self._get_response_revision(2, requested_rev)
+            data = self._build_mid0002_data(response_rev)
+            resp = build_message(2, rev=response_rev, data=data)
+            self.session_active = True
+            print(f"[Session] Communication started (rev {response_rev}).")
+            threading.Thread(target=self.send_tightening_results_loop, daemon=True).start()
         self.send_to_client(resp)
 
     def _handle_mid_0003(self, mid_int, rev, no_ack_flag, data_field, msg):
