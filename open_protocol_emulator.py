@@ -136,12 +136,51 @@ class OpenProtocolEmulator:
             63: self._handle_mid_0063,
         }
 
-    # === Stub MID Handlers (to be replaced with real implementations) ===
-    def _handle_mid_0001(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0003(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0004(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0005(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_9999(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    # === Communication MID Handlers ===
+
+    def _handle_mid_0001(self, mid_int, rev, no_ack_flag, data_field, msg):
+        if self.session_active:
+            resp = build_message(4, rev=1, data="000196")
+        else:
+            requested_rev = int(rev) if rev.strip() else 1
+            if requested_rev > 1:
+                resp = build_message(4, rev=1, data="000197")
+            else:
+                cell_id = "0001"
+                channel_id = "01"
+                data = f"01{cell_id}02{channel_id}03{self.controller_name}"
+                resp = build_message(2, rev=1, data=data)
+                self.session_active = True
+                print("[Session] Communication started.")
+                threading.Thread(target=self.send_tightening_results_loop, daemon=True).start()
+        self.send_to_client(resp)
+
+    def _handle_mid_0003(self, mid_int, rev, no_ack_flag, data_field, msg):
+        resp = build_message(5, rev=1, data="0003")
+        self.send_to_client(resp)
+        print("[Session] Communication stop received. Ending session.")
+        self.session_active = False
+        self.vin_subscribed = False
+        self.result_subscribed = False
+        self.pset_subscribed = False
+        try:
+            if self.client_socket:
+                self.client_socket.close()
+        except OSError:
+            pass
+        self.client_socket = None
+
+    def _handle_mid_0004(self, mid_int, rev, no_ack_flag, data_field, msg):
+        print(f"[Info] Received MID 0004 from client: Data='{data_field}' (ignored).")
+
+    def _handle_mid_0005(self, mid_int, rev, no_ack_flag, data_field, msg):
+        print(f"[Info] Received MID 0005 from client: Data='{data_field}' (ignored).")
+
+    def _handle_mid_9999(self, mid_int, rev, no_ack_flag, data_field, msg):
+        print("[KeepAlive] Received keep-alive message.")
+        resp = build_message(9999, rev=1)
+        self.send_to_client(resp)
+        print("[KeepAlive] Echo back keep-alive message.")
     def _handle_mid_0014(self, mid_int, rev, no_ack_flag, data_field, msg): pass
     def _handle_mid_0016(self, mid_int, rev, no_ack_flag, data_field, msg): pass
     def _handle_mid_0017(self, mid_int, rev, no_ack_flag, data_field, msg): pass
