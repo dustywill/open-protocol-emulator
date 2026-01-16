@@ -572,7 +572,7 @@ class OpenProtocolEmulator:
 
         params = {
             "01": f"{1:04d}", "02": f"{1:02d}", "03": self.controller_name,
-            "04": self.current_vin.ljust(25), "05": f"{0:02d}",
+            "04": self.current_vin.ljust(25)[:25], "05": f"{0:02d}",
             "06": (self.current_pset if self.current_pset else "0").rjust(3, '0'),
             "07": f"{current_target_batch_size:04d}",
             "08": f"{batch_counter_val:04d}",
