@@ -367,7 +367,17 @@ class OpenProtocolEmulator:
         # (Other MID handlers remain largely the same, ensure they use self.controller_name if needed)
         elif mid_int == 18: # MID 0018 Select Parameter set
             pset_id = data_field.strip()
-            if pset_id in self.available_psets:
+            if pset_id == "0" or pset_id == "000":
+                self.current_pset = "0"
+                self.pset_last_change = datetime.datetime.now()
+                resp = build_message(5, rev=1, data="0018")
+                print("[Pset] No Pset selected (Pset 0).")
+                if self.pset_subscribed:
+                    mid15_data = self._build_mid15_data()
+                    mid15_msg = build_message(15, rev=1, data=mid15_data)
+                    self.send_to_client(mid15_msg)
+                    print("[Pset] Sent MID 0015: Pset 0")
+            elif pset_id in self.available_psets:
                 self.current_pset = pset_id; self.pset_last_change = datetime.datetime.now()
                 resp = build_message(5, rev=1, data="0018") # Accept
                 print(f"[Pset] Pset {pset_id} selected.")
