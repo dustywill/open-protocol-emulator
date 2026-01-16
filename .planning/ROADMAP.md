@@ -19,6 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Technical Debt Cleanup** - Fix duplicate method, bare excepts, prepare codebase for expansion
 - [x] **Phase 2: MID Format Audit** - Audit all existing MID implementations against Open Protocol spec
 - [ ] **Phase 3: MID Format Fixes** - Fix spec deviations discovered during audit
+- [ ] **Phase 3.5: Architecture Refactor** - INSERTED: Refactor process_message() to registry-based dispatch
 - [ ] **Phase 4: Multi-Revision Implementation** - Implement revision 2+ response formats for all existing MIDs
 - [ ] **Phase 5: New MID Implementation** - Implement MID 0082, 0100-0102, 0214-0218
 - [ ] **Phase 6: Revision Configuration** - Add per-MID revision levels and controller profiles
@@ -80,9 +81,23 @@ Plans:
 - [x] 03-02: Fix tool control MIDs (MID 0040/0041 notifications)
 - [ ] 03-03: Fix tightening result MIDs (MID 0061 field lengths)
 
+### Phase 3.5: Architecture Refactor (INSERTED)
+**Goal**: Refactor process_message() from if/elif chain to registry-based dispatch
+**Depends on**: Phase 3
+**Research**: Unlikely (internal refactoring)
+
+Key work:
+- Create MID handler registry dictionary
+- Extract each MID handler to dedicated method
+- Reduce process_message() from ~200 lines to ~20 lines
+- Standardize handler signature for consistency
+
+Plans:
+- [ ] 03.5-01: Registry-based MID dispatch refactor
+
 ### Phase 4: Multi-Revision Implementation
 **Goal**: All existing MIDs support multiple revisions per Open Protocol spec
-**Depends on**: Phase 3
+**Depends on**: Phase 3.5
 **Research**: Likely (revision-specific field differences from spec)
 **Research topics**: Open Protocol specification for revision differences per MID - field additions, format changes, data length variations between revisions
 **Plans**: TBD
@@ -105,7 +120,7 @@ Plans:
 
 ### Phase 5: New MID Implementation
 **Goal**: Implement required new MIDs per spec
-**Depends on**: Phase 4
+**Depends on**: Phase 3.5
 **Research**: Likely (new MID specifications)
 **Research topics**: MID 0082 set time format, MID 0100-0102 multi-spindle message structure, MID 0214-0218 I/O and relay formats
 **Plans**: TBD
@@ -156,14 +171,15 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
+Phases execute in numeric order: 1 → 2 → 3 → 3.5 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Technical Debt Cleanup | 2/2 | Complete | 2026-01-16 |
 | 2. MID Format Audit | 3/3 | Complete | 2026-01-16 |
 | 3. MID Format Fixes | 2/3 | In progress | - |
+| 3.5. Architecture Refactor | 0/1 | Not started | - |
 | 4. Multi-Revision Implementation | 0/5 | Not started | - |
-| 5. New MID Implementation | 0/3 | Not started | - |
+| 5. New MID Implementation | 0/3 | Planned | - |
 | 6. Revision Configuration | 0/2 | Not started | - |
 | 7. GUI Expansion | 0/2 | Not started | - |
