@@ -306,10 +306,32 @@ class OpenProtocolEmulator:
         else:
             resp = build_message(4, rev=1, data="005407")
         self.send_to_client(resp)
-    def _handle_mid_0060(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0062(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0063(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    # === End Stub MID Handlers ===
+    # === Tightening Result MID Handlers ===
+
+    def _handle_mid_0060(self, mid_int, rev, no_ack_flag, data_field, msg):
+        req_rev = int(rev) if rev.strip() else 1
+        if req_rev > 1:
+            resp = build_message(4, rev=1, data="006097")
+        elif self.result_subscribed:
+            resp = build_message(4, rev=1, data="006009")
+        else:
+            self.result_subscribed = True
+            self.result_no_ack = (no_ack_flag == "1")
+            resp = build_message(5, rev=1, data="0060")
+            print("[Tightening] Result subscription accepted.")
+        self.send_to_client(resp)
+
+    def _handle_mid_0062(self, mid_int, rev, no_ack_flag, data_field, msg):
+        print("[Tightening] Tightening result acknowledged by client (MID 0062).")
+
+    def _handle_mid_0063(self, mid_int, rev, no_ack_flag, data_field, msg):
+        if self.result_subscribed:
+            self.result_subscribed = False
+            resp = build_message(5, rev=1, data="0063")
+            print("[Tightening] Unsubscribed from tightening results.")
+        else:
+            resp = build_message(4, rev=1, data="006310")
+        self.send_to_client(resp)
 
     def _initialize_default_pset_parameters(self):
         """Initializes default parameters for available Psets."""
