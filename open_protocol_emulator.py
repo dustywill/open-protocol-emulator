@@ -348,12 +348,14 @@ class OpenProtocolEmulator:
         elif mid_int == 41: # MID 0041 Enable tool command (Controller -> Client) - Ignore if received
             print("[Tool] Received Enable Tool Command (MID 0041) from client (unexpected). Ignoring.")
             return
-        elif mid_int == 42: # MID 0042 Request tool disable (Client -> Controller)
+        elif mid_int == 42:  # MID 0042 Disable Tool Request
             print("[Tool] Received Request Tool Disable (MID 0042).")
             self.tool_enabled = False
-            resp = build_message(5, rev=1, data="0042") # Confirm with MID 0005
+            resp = build_message(5, rev=1, data="0042")
             self.send_to_client(resp)
-            print("[Tool] Tool Disabled. Sent MID 0040 confirmation.")
+            notification = build_message(40, rev=1)
+            self.send_to_client(notification)
+            print("[Tool] Tool Disabled. Sent MID 0005 ack and MID 0040 notification.")
             return
         elif mid_int == 43: # MID 0043 Request tool enable (Client -> Controller)
             print("[Tool] Received Request Tool Enable (MID 0043).")
