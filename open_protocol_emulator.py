@@ -39,8 +39,11 @@ class OpenProtocolEmulator:
         self.port = port # Use passed-in port
         self.controller_name = controller_name.ljust(25)[:25] # Use passed-in name, ensure length
 
-        # State variables
-        self.session_active = False
+        self.state_lock = threading.RLock()
+
+        self._session_active = False
+        self._tool_enabled = True
+        self._auto_send_loop_active = True
         self.current_pset = None
         self.available_psets = {"001", "002", "003", "004", "005",
                                 "010", "011", "012", "013", "014", "015", 
@@ -60,9 +63,7 @@ class OpenProtocolEmulator:
         self.vin_no_ack = False
         self.result_subscribed = False
         self.result_no_ack = False
-        self.tool_enabled = True # Protocol state
-        self.auto_send_loop_active = True # GUI state
-        self.auto_loop_interval = 20 # Default auto loop interval in seconds
+        self.auto_loop_interval = 20
         self.pset_last_change = None
         self.pset_subscribed = False
         self.client_socket = None
@@ -75,6 +76,36 @@ class OpenProtocolEmulator:
         # --- End Pset Parameters Storage ---
 
         self._parse_vin(self.current_vin)
+
+    @property
+    def session_active(self):
+        with self.state_lock:
+            return self._session_active
+
+    @session_active.setter
+    def session_active(self, value):
+        with self.state_lock:
+            self._session_active = value
+
+    @property
+    def tool_enabled(self):
+        with self.state_lock:
+            return self._tool_enabled
+
+    @tool_enabled.setter
+    def tool_enabled(self, value):
+        with self.state_lock:
+            self._tool_enabled = value
+
+    @property
+    def auto_send_loop_active(self):
+        with self.state_lock:
+            return self._auto_send_loop_active
+
+    @auto_send_loop_active.setter
+    def auto_send_loop_active(self, value):
+        with self.state_lock:
+            self._auto_send_loop_active = value
 
     def _initialize_default_pset_parameters(self):
         """Initializes default parameters for available Psets."""
