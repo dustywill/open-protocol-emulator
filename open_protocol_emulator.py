@@ -192,7 +192,7 @@ class OpenProtocolEmulator:
                 print(f"[Server] Rejecting connection from {addr}: already connected.")
                 err_msg = build_message(4, rev=1, data="000196")
                 try: client_sock.sendall(err_msg)
-                except: pass
+                except (OSError, BrokenPipeError): pass
                 client_sock.close()
                 continue
 
@@ -214,13 +214,13 @@ class OpenProtocolEmulator:
                 except (OSError, BrokenPipeError, ConnectionResetError) as e:
                     print(f"[Send Error] Connection issue: {e}")
                     try: self.client_socket.close()
-                    except: pass
+                    except OSError: pass
                     self.client_socket = None
                     self.session_active = False # Ensure session ends on error
                 except Exception as e:
                     print(f"[Send Error] Unexpected error: {e}")
                     try: self.client_socket.close()
-                    except: pass
+                    except OSError: pass
                     self.client_socket = None
                     self.session_active = False
 
@@ -251,7 +251,7 @@ class OpenProtocolEmulator:
         self.session_active = False
         self.vin_subscribed = False; self.result_subscribed = False; self.pset_subscribed = False
         try: sock.close()
-        except: pass
+        except OSError: pass
         self.client_socket = None
 
     def process_message(self, msg: bytes):
@@ -290,7 +290,7 @@ class OpenProtocolEmulator:
             self.vin_subscribed = False; self.result_subscribed = False; self.pset_subscribed = False
             try:
                 if self.client_socket: self.client_socket.close()
-            except: pass
+            except OSError: pass
             self.client_socket = None
             return
 
