@@ -259,10 +259,53 @@ class OpenProtocolEmulator:
         notification = build_message(41, rev=1)
         self.send_to_client(notification)
         print("[Tool] Tool Enabled. Sent MID 0005 ack and MID 0041 notification.")
-    def _handle_mid_0050(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0051(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0053(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0054(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    # === VIN MID Handlers ===
+
+    def _handle_mid_0050(self, mid_int, rev, no_ack_flag, data_field, msg):
+        vin = data_field.strip()
+        print(f"[VIN] Received VIN download: {vin}")
+        if self._parse_vin(vin):
+            self.current_vin = vin
+            with self.state_lock:
+                self.batch_counter = 0
+            print("[VIN] Batch counter reset due to new VIN.")
+        resp = build_message(5, rev=1, data="0050")
+        self.send_to_client(resp)
+        if self.vin_subscribed:
+            vin_param = self.current_vin.ljust(25)[:25]
+            vin_data = build_message(52, rev=1, data=vin_param, no_ack=self.vin_no_ack)
+            self.send_to_client(vin_data)
+            print(f"[VIN] Sent VIN update (MID 0052): {self.current_vin}")
+
+    def _handle_mid_0051(self, mid_int, rev, no_ack_flag, data_field, msg):
+        req_rev = int(rev) if rev.strip() else 1
+        if req_rev > 1:
+            resp = build_message(4, rev=1, data="005197")
+        elif self.vin_subscribed:
+            resp = build_message(4, rev=1, data="005106")
+        else:
+            self.vin_subscribed = True
+            self.vin_no_ack = (no_ack_flag == "1")
+            resp = build_message(5, rev=1, data="0051")
+            print("[VIN] Subscription accepted.")
+            if self.current_vin:
+                vin_param = self.current_vin.ljust(25)[:25]
+                vin_data = build_message(52, rev=1, data=vin_param, no_ack=self.vin_no_ack)
+                self.send_to_client(vin_data)
+                print(f"[VIN] Sent current VIN (MID 0052): {self.current_vin}")
+        self.send_to_client(resp)
+
+    def _handle_mid_0053(self, mid_int, rev, no_ack_flag, data_field, msg):
+        print("[VIN] VIN event acknowledged by client (MID 0053).")
+
+    def _handle_mid_0054(self, mid_int, rev, no_ack_flag, data_field, msg):
+        if self.vin_subscribed:
+            self.vin_subscribed = False
+            resp = build_message(5, rev=1, data="0054")
+            print("[VIN] Unsubscribed from VIN updates.")
+        else:
+            resp = build_message(4, rev=1, data="005407")
+        self.send_to_client(resp)
     def _handle_mid_0060(self, mid_int, rev, no_ack_flag, data_field, msg): pass
     def _handle_mid_0062(self, mid_int, rev, no_ack_flag, data_field, msg): pass
     def _handle_mid_0063(self, mid_int, rev, no_ack_flag, data_field, msg): pass
