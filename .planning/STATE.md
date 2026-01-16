@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-16)
 
 **Core value:** Correct Open Protocol message formats that match the official specification exactly
-**Current focus:** Phase 3 — MID Format Fixes
+**Current focus:** Phase 3.5 — Architecture Refactor
 
 ## Current Position
 
-Phase: 3 of 7 (MID Format Fixes)
-Plan: 3 of 3 in current phase
+Phase: 3.5 of 7 (Architecture Refactor)
+Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-16 — Completed 03-03-PLAN.md
+Last activity: 2026-01-16 — Completed 03.5-01-PLAN.md
 
-Progress: █████░░░░░ 45%
+Progress: █████░░░░░ 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: ~9 min
-- Total execution time: ~71 min
+- Total execution time: ~83 min
 
 **By Phase:**
 
@@ -30,10 +30,11 @@ Progress: █████░░░░░ 45%
 | 01 | 2 | ~15min | ~7min |
 | 02 | 3 | ~35min | ~12min |
 | 03 | 3 | ~21min | ~7min |
+| 03.5 | 1 | ~12min | ~12min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02, 02-03, 03-01, 03-02, 03-03
-- Trend: Stable (fix plans faster than audit plans)
+- Last 5 plans: 02-03, 03-01, 03-02, 03-03, 03.5-01
+- Trend: Stable (refactor plan comparable to audit plans)
 
 ## Accumulated Context
 
@@ -57,6 +58,8 @@ Recent decisions affecting current work:
 | 03-01 | Pset 0 stored as "0" internally | Consistency with other Pset IDs |
 | 03-02 | MID 0040/0041 use header-only format (rev 1) | No data field needed per Open Protocol spec |
 | 03-03 | Extended tightening ID counter modulo to 10 billion | Support full 10-digit range per spec |
+| 03.5-01 | Standardized handler signature: (mid_int, rev, no_ack_flag, data_field, msg) | All parsed values available to handlers |
+| 03.5-01 | Registry pattern for MID dispatch | Adding new MIDs requires only handler + registration |
 
 ### Deferred Issues
 
@@ -69,6 +72,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Completed 03-03-PLAN.md (Phase 3 complete)
+Stopped at: Completed 03.5-01-PLAN.md (Phase 3.5 complete)
 Resume file: None
-Next: Phase 4 (Multi-Revision Implementation) - plan-phase or discuss-phase
+Next: Phase 4 (Multi-Revision Implementation) or Phase 5 (New MID Implementation)
