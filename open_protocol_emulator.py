@@ -206,11 +206,27 @@ class OpenProtocolEmulator:
 
         return "".join(fields)
 
+    def _build_mid0004_data(self, revision: int, mid: int, error_code: int, extra_text: str = "") -> str:
+        """Build MID 0004 error response data for given revision (1-3)."""
+        fields = []
+
+        fields.append(f"{mid:04d}")
+        fields.append(f"{error_code:02d}")
+
+        if revision >= 2:
+            fields.append(f"{mid:04d}")
+
+        if revision >= 3:
+            fields.append(f"{extra_text.ljust(25)[:25]}")
+
+        return "".join(fields)
+
     # === Communication MID Handlers ===
 
     def _handle_mid_0001(self, mid_int, rev, no_ack_flag, data_field, msg):
         if self.session_active:
-            resp = build_message(4, rev=1, data="000196")
+            error_data = self._build_mid0004_data(1, 1, 96)
+            resp = build_message(4, rev=1, data=error_data)
         else:
             requested_rev = int(rev) if rev.strip() else 1
             response_rev = self._get_response_revision(2, requested_rev)
@@ -251,7 +267,8 @@ class OpenProtocolEmulator:
 
     def _handle_mid_0014(self, mid_int, rev, no_ack_flag, data_field, msg):
         if self.pset_subscribed:
-            resp = build_message(4, rev=1, data="001406")
+            error_data = self._build_mid0004_data(1, 14, 6)
+            resp = build_message(4, rev=1, data=error_data)
         else:
             self.pset_subscribed = True
             resp = build_message(5, rev=1, data="0014")
@@ -272,7 +289,8 @@ class OpenProtocolEmulator:
             resp = build_message(5, rev=1, data="0017")
             print("[Pset] Unsubscribed from Pset selection.")
         else:
-            resp = build_message(4, rev=1, data="001707")
+            error_data = self._build_mid0004_data(1, 17, 7)
+            resp = build_message(4, rev=1, data=error_data)
         self.send_to_client(resp)
 
     def _handle_mid_0018(self, mid_int, rev, no_ack_flag, data_field, msg):
@@ -298,7 +316,8 @@ class OpenProtocolEmulator:
                 self.send_to_client(mid15_msg)
                 print(f"[Pset] Sent MID 0015: {self.current_pset}")
         else:
-            resp = build_message(4, rev=1, data="001802")
+            error_data = self._build_mid0004_data(1, 18, 2)
+            resp = build_message(4, rev=1, data=error_data)
         self.send_to_client(resp)
     # === Tool Control MID Handlers ===
 
@@ -346,9 +365,11 @@ class OpenProtocolEmulator:
     def _handle_mid_0051(self, mid_int, rev, no_ack_flag, data_field, msg):
         req_rev = int(rev) if rev.strip() else 1
         if req_rev > 1:
-            resp = build_message(4, rev=1, data="005197")
+            error_data = self._build_mid0004_data(1, 51, 97)
+            resp = build_message(4, rev=1, data=error_data)
         elif self.vin_subscribed:
-            resp = build_message(4, rev=1, data="005106")
+            error_data = self._build_mid0004_data(1, 51, 6)
+            resp = build_message(4, rev=1, data=error_data)
         else:
             self.vin_subscribed = True
             self.vin_no_ack = (no_ack_flag == "1")
@@ -370,16 +391,19 @@ class OpenProtocolEmulator:
             resp = build_message(5, rev=1, data="0054")
             print("[VIN] Unsubscribed from VIN updates.")
         else:
-            resp = build_message(4, rev=1, data="005407")
+            error_data = self._build_mid0004_data(1, 54, 7)
+            resp = build_message(4, rev=1, data=error_data)
         self.send_to_client(resp)
     # === Tightening Result MID Handlers ===
 
     def _handle_mid_0060(self, mid_int, rev, no_ack_flag, data_field, msg):
         req_rev = int(rev) if rev.strip() else 1
         if req_rev > 1:
-            resp = build_message(4, rev=1, data="006097")
+            error_data = self._build_mid0004_data(1, 60, 97)
+            resp = build_message(4, rev=1, data=error_data)
         elif self.result_subscribed:
-            resp = build_message(4, rev=1, data="006009")
+            error_data = self._build_mid0004_data(1, 60, 9)
+            resp = build_message(4, rev=1, data=error_data)
         else:
             self.result_subscribed = True
             self.result_no_ack = (no_ack_flag == "1")
@@ -396,7 +420,8 @@ class OpenProtocolEmulator:
             resp = build_message(5, rev=1, data="0063")
             print("[Tightening] Unsubscribed from tightening results.")
         else:
-            resp = build_message(4, rev=1, data="006310")
+            error_data = self._build_mid0004_data(1, 63, 10)
+            resp = build_message(4, rev=1, data=error_data)
         self.send_to_client(resp)
 
     def _initialize_default_pset_parameters(self):
@@ -518,7 +543,8 @@ class OpenProtocolEmulator:
 
             if self.session_active:
                 print(f"[Server] Rejecting connection from {addr}: already connected.")
-                err_msg = build_message(4, rev=1, data="000196")
+                error_data = self._build_mid0004_data(1, 1, 96)
+                err_msg = build_message(4, rev=1, data=error_data)
                 try: client_sock.sendall(err_msg)
                 except (OSError, BrokenPipeError): pass
                 client_sock.close()
@@ -603,8 +629,8 @@ class OpenProtocolEmulator:
         if handler:
             handler(mid_int, rev, no_ack_flag, data_field, msg)
         else:
-            err_data = f"{mid}{'99'}"
-            resp = build_message(4, rev=1, data=err_data)
+            error_data = self._build_mid0004_data(1, mid_int, 99)
+            resp = build_message(4, rev=1, data=error_data)
             self.send_to_client(resp)
             print(f"[Unknown] Received unsupported MID {mid}. Sent error.")
 
