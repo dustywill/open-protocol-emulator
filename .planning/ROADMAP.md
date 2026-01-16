@@ -38,7 +38,7 @@ Key work:
 - Consider dispatch pattern refactor for `process_message()` if beneficial
 
 Plans:
-- [ ] 01-01: Fix duplicate method and bare except clauses
+- [x] 01-01: Fix duplicate method and bare except clauses
 - [ ] 01-02: Thread safety improvements for shared state
 
 ### Phase 2: MID Format Audit
@@ -133,7 +133,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Technical Debt Cleanup | 0/2 | Not started | - |
+| 1. Technical Debt Cleanup | 1/2 | In progress | - |
 | 2. MID Format Audit | 0/3 | Not started | - |
 | 3. MID Format Fixes | 0/1 | Not started | - |
 | 4. New MID Implementation | 0/3 | Not started | - |
