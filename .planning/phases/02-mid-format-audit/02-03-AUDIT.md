@@ -217,3 +217,139 @@ Example output: `2026-01-16:14:30:45` (19 characters) - **Correct**
 
 ---
 
+## MID 0062 - Last Tightening Result Acknowledge
+
+### Spec Reference
+Open Protocol R2.8.0 - MID 0062 is sent by integrator to acknowledge receipt of MID 0061.
+
+**Per Specification:**
+- Message format: Standard header only (no data fields)
+- Sent by integrator after receiving MID 0061 (when NoAck=0)
+- Controller expects this before sending next result (flow control)
+- No error responses defined for MID 0062
+
+### Current Implementation (Line 450)
+
+```python
+elif mid_int == 62: print("[Tightening] Tightening result acknowledged by client (MID 0062).")
+```
+
+### Deviations Found
+
+| ID | Field/Feature | Spec | Current | Severity | Notes |
+|----|--------------|------|---------|----------|-------|
+| 0062-D1 | Flow control | Should wait for ack before next result | Results sent on timer regardless | **Minor** | Emulator behavior, not protocol error |
+
+### Assessment
+MID 0062 handling is minimal but acceptable for an emulator. The message is logged but doesn't block the next result from being sent. This is a design choice for emulator simplicity rather than a spec violation.
+
+---
+
+## MID 0063 - Last Tightening Result Unsubscribe
+
+### Spec Reference
+Open Protocol R2.8.0 - MID 0063 unsubscribes from tightening results.
+
+**Per Specification:**
+- Message format: Standard header only (no data fields)
+- Response: MID 0005 (positive ack) with data "0063"
+- Error code 10: Not subscribed
+
+### Current Implementation (Lines 452-458)
+
+```python
+elif mid_int == 63: # MID 0063 Last tightening result unsubscribe
+    if self.result_subscribed:
+        self.result_subscribed = False; resp = build_message(5, rev=1, data="0063") # Accept
+        print("[Tightening] Unsubscribed from tightening results.")
+    else: resp = build_message(4, rev=1, data="006310") # Error: Not subscribed
+    self.send_to_client(resp)
+    return
+```
+
+### Deviations Found
+
+| ID | Field/Feature | Spec | Current | Severity | Notes |
+|----|--------------|------|---------|----------|-------|
+| 0063-D1 | Error code 10 format | 4-digit MID + 2-digit error | "006310" | OK | Format correct |
+| 0063-D2 | Positive ack format | MID 0005 with data "0063" | Correct | OK | Matches spec |
+
+### Assessment
+MID 0063 handling is correct. Error code 10 for "not subscribed" is properly returned.
+
+---
+
+## Audit Summary
+
+### Deviation Counts by Severity
+
+| MID | Critical | Major | Minor | Total |
+|-----|----------|-------|-------|-------|
+| 0060 | 0 | 2 | 0 | 2 |
+| 0061 | 0 | 1 | 6 | 7 |
+| 0062 | 0 | 0 | 1 | 1 |
+| 0063 | 0 | 0 | 0 | 0 |
+| **Total** | **0** | **3** | **7** | **10** |
+
+### Prioritized Fix List
+
+**Priority 1 - Major Deviations (Must Fix):**
+
+| ID | MID | Issue | Fix |
+|----|-----|-------|-----|
+| 0060-D1 | 0060 | Only revision 1 accepted | Implement revision negotiation |
+| 0060-D3 | 0060 | Subscribed revision not stored | Store requested revision for MID 0061 |
+| 0061-D5 | 0061 | Tightening ID is 4 digits | Change to 10 digits (`{:010d}`) |
+
+**Priority 2 - Minor Deviations (Should Fix):**
+
+| ID | MID | Issue | Fix |
+|----|-----|-------|-----|
+| 0061-D1 | 0061 | VIN not truncated | Add `[:25]` truncation |
+| 0061-D2/D3/D4 | 0061 | Hardcoded Cell/Channel/Job IDs | Make configurable (optional) |
+| 0061-D6 | 0061 | Batch status 2 never used | Consider adding batch NOK logic |
+| 0062-D1 | 0062 | No flow control | Consider ack-based send throttling |
+
+### Impact Assessment
+
+**Integrator Compatibility:**
+- Revision 1 only support will cause issues with integrators expecting higher revisions
+- Tightening ID length mismatch may cause parsing failures in strict integrators
+- Overall: Medium impact, needs Phase 3 attention
+
+**Protocol Compliance:**
+- MID 0060-0063 are mostly compliant with revision 1 spec
+- Major issue: Field 23 length deviation breaks the 167-byte expected message size
+- Overall: Partial compliance (revision 1 only)
+
+### Calculated MID 0061 Rev 1 Message Size
+
+```
+Header: 20 bytes (length 4 + MID 4 + rev 3 + noack 1 + station 2 + spindle 2 + spare 4)
+Field prefixes: 23 fields x 2 chars = 46 bytes
+Field 01 Cell ID: 4 bytes
+Field 02 Channel ID: 2 bytes
+Field 03 Controller name: 25 bytes
+Field 04 VIN: 25 bytes
+Field 05 Job ID: 2 bytes
+Field 06 Pset ID: 3 bytes
+Field 07 Batch size: 4 bytes
+Field 08 Batch counter: 4 bytes
+Field 09 Tightening status: 1 byte
+Field 10 Torque status: 1 byte
+Field 11 Angle status: 1 byte
+Field 12-15 Torque values: 4 x 6 = 24 bytes
+Field 16-19 Angle values: 4 x 5 = 20 bytes
+Field 20-21 Timestamps: 2 x 19 = 38 bytes
+Field 22 Batch status: 1 byte
+Field 23 Tightening ID: 10 bytes (spec) / 4 bytes (current)
+
+Spec total data: 155 bytes + 46 prefixes = 201 bytes
+Current total data: 149 bytes + 46 prefixes = 195 bytes (6 bytes short)
+
+Full message (spec): 20 + 201 + 1 (NUL) = 222 bytes
+Full message (current): 20 + 195 + 1 (NUL) = 216 bytes
+```
+
+**Discrepancy:** Current implementation produces messages 6 bytes shorter than spec due to Tightening ID field.
+
