@@ -228,7 +228,8 @@ class OpenProtocolEmulator:
                 continue
 
             self.tightening_id_counter = 0
-            self.batch_counter = 0
+            with self.state_lock:
+                self.batch_counter = 0
             self.tool_enabled = True
             self.auto_send_loop_active = True
             print(f"[Server] New client connected from {addr}, resetting counters and enabling tool/loop.")
@@ -394,8 +395,10 @@ class OpenProtocolEmulator:
             vin = data_field.strip()
             print(f"[VIN] Received VIN download: {vin}")
             if self._parse_vin(vin):
-                 self.current_vin = vin; self.batch_counter = 0
-                 print("[VIN] Batch counter reset due to new VIN.")
+                self.current_vin = vin
+                with self.state_lock:
+                    self.batch_counter = 0
+                print("[VIN] Batch counter reset due to new VIN.")
             resp = build_message(5, rev=1, data="0050") # Accept
             self.send_to_client(resp)
             if self.vin_subscribed:
@@ -522,23 +525,28 @@ class OpenProtocolEmulator:
                 actual_angle = random.uniform(angle_min - 20, angle_min - 1) if angle_status == "0" else random.uniform(angle_max + 1, angle_max + 20)
 
 
-        batch_completed = False
-        # Use the current_target_batch_size derived from Pset or global
-        if status == "1" and current_target_batch_size > 0:
-            self.batch_counter += 1
-            print(f"[Batch] Counter incremented to {self.batch_counter}/{current_target_batch_size}")
+        with self.state_lock:
+            if status == "1" and current_target_batch_size > 0:
+                self.batch_counter += 1
+                print(f"[Batch] Counter incremented to {self.batch_counter}/{current_target_batch_size}")
 
-        # Use the current_target_batch_size for batch status check
-        if current_target_batch_size == 0: batch_status = "0"
-        elif self.batch_counter < current_target_batch_size: batch_status = "0"
-        else: batch_status = "1"; batch_completed = True
+            batch_counter_val = self.batch_counter
+            if current_target_batch_size == 0:
+                batch_status = "0"
+                batch_completed = False
+            elif batch_counter_val < current_target_batch_size:
+                batch_status = "0"
+                batch_completed = False
+            else:
+                batch_status = "1"
+                batch_completed = True
 
         params = {
-            "01": f"{1:04d}", "02": f"{1:02d}", "03": self.controller_name, # Use configured name
+            "01": f"{1:04d}", "02": f"{1:02d}", "03": self.controller_name,
             "04": self.current_vin.ljust(25), "05": f"{0:02d}",
             "06": (self.current_pset if self.current_pset else "0").rjust(3, '0'),
-            "07": f"{current_target_batch_size:04d}", # Use current_target_batch_size
-            "08": f"{self.batch_counter:04d}",
+            "07": f"{current_target_batch_size:04d}",
+            "08": f"{batch_counter_val:04d}",
             "09": status, "10": torque_status, "11": angle_status,
             "12": f"{int(torque_min*100):06d}", "13": f"{int(torque_max*100):06d}",
             "14": f"{int(target_torque*100):06d}", "15": f"{int(actual_torque*100):06d}",
@@ -552,11 +560,13 @@ class OpenProtocolEmulator:
         result_msg = build_message(61, rev=1, data=data, no_ack=self.result_no_ack)
         self.send_to_client(result_msg)
         # Update print statement to show the batch size being used
-        print(f"[Tightening] Sent result (MID 0061, ID: {tightening_id_str}). Status: {'OK' if status == '1' else 'NOK'}, Batch: {self.batch_counter}/{current_target_batch_size}")
+        print(f"[Tightening] Sent result (MID 0061, ID: {tightening_id_str}). Status: {'OK' if status == '1' else 'NOK'}, Batch: {batch_counter_val}/{current_target_batch_size}")
 
         if batch_completed:
             print("[Batch] Batch complete!")
-            self._increment_vin(); self.batch_counter = 0
+            self._increment_vin()
+            with self.state_lock:
+                self.batch_counter = 0
             print("[Batch] VIN incremented and counter reset.")
 
 
@@ -613,9 +623,13 @@ class OpenProtocolEmulator:
                 new_vin = vin_var.get()
                 if new_vin != self.current_vin:
                     if self._parse_vin(new_vin):
-                        self.current_vin = new_vin; self.batch_counter = 0
+                        self.current_vin = new_vin
+                        with self.state_lock:
+                            self.batch_counter = 0
                         print(f"[GUI Apply] VIN set to {self.current_vin}, batch counter reset.")
-                    else: messagebox.showerror("Error", f"Invalid VIN format: {new_vin}"); vin_var.set(self.current_vin)
+                    else:
+                        messagebox.showerror("Error", f"Invalid VIN format: {new_vin}")
+                        vin_var.set(self.current_vin)
 
                 # Global batch size is now less relevant, but keep for fallback or other uses
                 new_batch_size = int(batch_size_var.get())
@@ -712,9 +726,10 @@ class OpenProtocolEmulator:
         def update_labels():
             pset_display_var.set("Pset: " + (self.current_pset if self.current_pset else "Not set"))
             conn_display_var.set("Status: " + ("Connected" if self.session_active else "Disconnected"))
-            # Display batch counter based on current Pset's target batch size
             current_target_batch = self.pset_parameters.get(self.current_pset, {}).get("batch_size", self.target_batch_size)
-            batch_display_var.set(f"Batch: {self.batch_counter}/{current_target_batch}")
+            with self.state_lock:
+                current_batch = self.batch_counter
+            batch_display_var.set(f"Batch: {current_batch}/{current_target_batch}")
 
             vin_display_var.set(f"VIN: {self.current_vin}")
             tool_protocol_status_var.set("Tool Status: " + ("Enabled" if self.tool_enabled else "Disabled"))
