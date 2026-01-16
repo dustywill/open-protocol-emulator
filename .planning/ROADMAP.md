@@ -59,7 +59,7 @@ Key work:
 - Document deviations with spec references
 
 Plans:
-- [ ] 02-01: Audit communication and control MIDs (0001-0005, 0042-0043, 9999)
+- [x] 02-01: Audit communication and control MIDs (0001-0005, 0042-0043, 9999)
 - [ ] 02-02: Audit parameter and VIN MIDs (0014-0018, 0050-0054)
 - [ ] 02-03: Audit tightening result MIDs (0060-0063)
 
@@ -158,7 +158,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Technical Debt Cleanup | 2/2 | Complete | 2026-01-16 |
-| 2. MID Format Audit | 2/3 | In progress | - |
+| 2. MID Format Audit | 1/3 | In progress | - |
 | 3. MID Format Fixes | 0/1 | Not started | - |
 | 4. Multi-Revision Implementation | 0/5 | Not started | - |
 | 5. New MID Implementation | 0/3 | Not started | - |
