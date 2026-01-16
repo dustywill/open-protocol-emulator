@@ -77,7 +77,7 @@ Key work:
 
 Plans:
 - [x] 03-01: Fix parameter set MIDs (MID 0015 format, MID 0017, MID 0018 Pset 0)
-- [ ] 03-02: Fix tool control MIDs (MID 0040/0041 notifications)
+- [x] 03-02: Fix tool control MIDs (MID 0040/0041 notifications)
 - [ ] 03-03: Fix tightening result MIDs (MID 0061 field lengths)
 
 ### Phase 4: Multi-Revision Implementation
@@ -162,7 +162,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Technical Debt Cleanup | 2/2 | Complete | 2026-01-16 |
 | 2. MID Format Audit | 3/3 | Complete | 2026-01-16 |
-| 3. MID Format Fixes | 1/3 | In progress | - |
+| 3. MID Format Fixes | 2/3 | In progress | - |
 | 4. Multi-Revision Implementation | 0/5 | Not started | - |
 | 5. New MID Implementation | 0/3 | Not started | - |
 | 6. Revision Configuration | 0/2 | Not started | - |

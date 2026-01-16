@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 ## Current Position
 
 Phase: 3 of 7 (MID Format Fixes)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-01-16 — Completed 03-01-PLAN.md
+Last activity: 2026-01-16 — Completed 03-02-PLAN.md
 
-Progress: ████░░░░░░ 33%
+Progress: ████░░░░░░ 40%
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Recent decisions affecting current work:
 | 02-03 | Flow control (0062) optional for emulator | Emulator simplicity acceptable |
 | 03-01 | Use _build_mid15_data() helper method | Avoids duplication between MID 0014 and MID 0018 handlers |
 | 03-01 | Pset 0 stored as "0" internally | Consistency with other Pset IDs |
+| 03-02 | MID 0040/0041 use header-only format (rev 1) | No data field needed per Open Protocol spec |
 
 ### Deferred Issues
 
@@ -67,6 +68,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Completed 03-01-PLAN.md
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None
-Next: Execute 03-02-PLAN.md (tool control MID fixes)
+Next: Execute 03-03-PLAN.md (tightening result MID fixes)
