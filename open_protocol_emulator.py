@@ -505,8 +505,8 @@ class OpenProtocolEmulator:
             print("[Tightening] Send prevented: Session inactive or not subscribed.")
             return
 
-        self.tightening_id_counter = (self.tightening_id_counter + 1) % 10000
-        tightening_id_str = f"{self.tightening_id_counter:04d}"
+        self.tightening_id_counter = (self.tightening_id_counter + 1) % 10000000000
+        tightening_id_str = f"{self.tightening_id_counter:010d}"
 
         tighten_time = datetime.datetime.now()
         timestamp_str = tighten_time.strftime("%Y-%m-%d:%H:%M:%S")
