@@ -185,10 +185,31 @@ class OpenProtocolEmulator:
     def _handle_mid_0016(self, mid_int, rev, no_ack_flag, data_field, msg): pass
     def _handle_mid_0017(self, mid_int, rev, no_ack_flag, data_field, msg): pass
     def _handle_mid_0018(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0040(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0041(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0042(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0043(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    # === Tool Control MID Handlers ===
+
+    def _handle_mid_0040(self, mid_int, rev, no_ack_flag, data_field, msg):
+        print("[Tool] Received Disable Tool Command (MID 0040) from client (unexpected). Ignoring.")
+
+    def _handle_mid_0041(self, mid_int, rev, no_ack_flag, data_field, msg):
+        print("[Tool] Received Enable Tool Command (MID 0041) from client (unexpected). Ignoring.")
+
+    def _handle_mid_0042(self, mid_int, rev, no_ack_flag, data_field, msg):
+        print("[Tool] Received Request Tool Disable (MID 0042).")
+        self.tool_enabled = False
+        resp = build_message(5, rev=1, data="0042")
+        self.send_to_client(resp)
+        notification = build_message(40, rev=1)
+        self.send_to_client(notification)
+        print("[Tool] Tool Disabled. Sent MID 0005 ack and MID 0040 notification.")
+
+    def _handle_mid_0043(self, mid_int, rev, no_ack_flag, data_field, msg):
+        print("[Tool] Received Request Tool Enable (MID 0043).")
+        self.tool_enabled = True
+        resp = build_message(5, rev=1, data="0043")
+        self.send_to_client(resp)
+        notification = build_message(41, rev=1)
+        self.send_to_client(notification)
+        print("[Tool] Tool Enabled. Sent MID 0005 ack and MID 0041 notification.")
     def _handle_mid_0050(self, mid_int, rev, no_ack_flag, data_field, msg): pass
     def _handle_mid_0051(self, mid_int, rev, no_ack_flag, data_field, msg): pass
     def _handle_mid_0053(self, mid_int, rev, no_ack_flag, data_field, msg): pass
