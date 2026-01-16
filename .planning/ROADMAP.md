@@ -67,15 +67,18 @@ Plans:
 **Goal**: All existing MIDs match Open Protocol specification exactly
 **Depends on**: Phase 2
 **Research**: Unlikely (fixing based on audit results from Phase 2)
-**Plans**: TBD (depends on audit findings)
 
 Key work:
-- Fix all deviations documented in Phase 2 audit
-- Add/update tests to verify spec compliance
-- Validate fixed MIDs against spec
+- Fix MID 0015 format (add Date of Last Change field)
+- Implement MID 0017 (parameter set unsubscribe)
+- Add MID 0040/0041 notifications after tool control
+- Fix MID 0061 tightening ID field length (4→10 digits)
+- Fix VIN truncation in MID 0061
 
 Plans:
-- [ ] 03-01: Fix deviations found in audit (specific plans TBD after audit)
+- [ ] 03-01: Fix parameter set MIDs (MID 0015 format, MID 0017, MID 0018 Pset 0)
+- [ ] 03-02: Fix tool control MIDs (MID 0040/0041 notifications)
+- [ ] 03-03: Fix tightening result MIDs (MID 0061 field lengths)
 
 ### Phase 4: Multi-Revision Implementation
 **Goal**: All existing MIDs support multiple revisions per Open Protocol spec
@@ -159,7 +162,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Technical Debt Cleanup | 2/2 | Complete | 2026-01-16 |
 | 2. MID Format Audit | 3/3 | Complete | 2026-01-16 |
-| 3. MID Format Fixes | 0/1 | Not started | - |
+| 3. MID Format Fixes | 0/3 | Not started | - |
 | 4. Multi-Revision Implementation | 0/5 | Not started | - |
 | 5. New MID Implementation | 0/3 | Not started | - |
 | 6. Revision Configuration | 0/2 | Not started | - |
