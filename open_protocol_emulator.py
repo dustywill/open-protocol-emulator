@@ -151,23 +151,6 @@ class OpenProtocolEmulator:
             return False
 
     def _increment_vin(self):
-        """Parses VIN into prefix and numeric parts."""
-        match = re.match(r'^(.*?)(\d+)$', vin_string)
-        if match:
-            self.vin_prefix = match.group(1)
-            self.vin_numeric_str = match.group(2)
-            self.vin_padding = len(self.vin_numeric_str)
-            print(f"[VIN Parse] Parsed: Prefix='{self.vin_prefix}', Numeric='{self.vin_numeric_str}', Padding={self.vin_padding}")
-            return True
-        else:
-            print(f"[VIN Parse] Error: Could not parse VIN '{vin_string}'. Using defaults.")
-            self.vin_prefix = vin_string
-            self.vin_numeric_str = "0"
-            self.vin_padding = 1
-            self.current_vin = vin_string + "0"
-            return False
-
-    def _increment_vin(self):
         """Increments the numeric part of the VIN and updates the state."""
         try:
             numeric_val = int(self.vin_numeric_str)
