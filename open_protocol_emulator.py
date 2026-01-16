@@ -77,6 +77,11 @@ class OpenProtocolEmulator:
 
         self._parse_vin(self.current_vin)
 
+        # --- MID Handler Registry ---
+        self.mid_handlers = {}
+        self._register_mid_handlers()
+        # --- End MID Handler Registry ---
+
     @property
     def session_active(self):
         with self.state_lock:
@@ -106,6 +111,53 @@ class OpenProtocolEmulator:
     def auto_send_loop_active(self, value):
         with self.state_lock:
             self._auto_send_loop_active = value
+
+    def _register_mid_handlers(self):
+        self.mid_handlers = {
+            1: self._handle_mid_0001,
+            3: self._handle_mid_0003,
+            4: self._handle_mid_0004,
+            5: self._handle_mid_0005,
+            9999: self._handle_mid_9999,
+            14: self._handle_mid_0014,
+            16: self._handle_mid_0016,
+            17: self._handle_mid_0017,
+            18: self._handle_mid_0018,
+            40: self._handle_mid_0040,
+            41: self._handle_mid_0041,
+            42: self._handle_mid_0042,
+            43: self._handle_mid_0043,
+            50: self._handle_mid_0050,
+            51: self._handle_mid_0051,
+            53: self._handle_mid_0053,
+            54: self._handle_mid_0054,
+            60: self._handle_mid_0060,
+            62: self._handle_mid_0062,
+            63: self._handle_mid_0063,
+        }
+
+    # === Stub MID Handlers (to be replaced with real implementations) ===
+    def _handle_mid_0001(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0003(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0004(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0005(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_9999(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0014(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0016(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0017(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0018(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0040(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0041(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0042(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0043(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0050(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0051(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0053(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0054(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0060(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0062(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    def _handle_mid_0063(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    # === End Stub MID Handlers ===
 
     def _initialize_default_pset_parameters(self):
         """Initializes default parameters for available Psets."""
