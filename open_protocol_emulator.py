@@ -164,6 +164,11 @@ class OpenProtocolEmulator:
             print(f"[Pset Params] Error saving parameters to {filename}: {e}")
 
 
+    def _build_mid15_data(self):
+        pset_id = self.current_pset.rjust(3, '0') if self.current_pset else "000"
+        date_str = self.pset_last_change.strftime("%Y-%m-%d:%H:%M:%S") if self.pset_last_change else datetime.datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+        return pset_id + date_str
+
     def _parse_vin(self, vin_string):
         """Parses VIN into prefix and numeric parts."""
         match = re.match(r'^(.*?)(\d+)$', vin_string)
@@ -367,7 +372,7 @@ class OpenProtocolEmulator:
                 resp = build_message(5, rev=1, data="0018") # Accept
                 print(f"[Pset] Pset {pset_id} selected.")
                 if self.pset_subscribed:
-                    mid15_data = self.current_pset.rjust(3, '0')
+                    mid15_data = self._build_mid15_data()
                     mid15_msg = build_message(15, rev=1, data=mid15_data)
                     self.send_to_client(mid15_msg)
                     print(f"[Pset] Sent MID 0015: {self.current_pset}")
@@ -382,7 +387,7 @@ class OpenProtocolEmulator:
                 resp = build_message(5, rev=1, data="0014") # Accept
                 print("[Pset] Pset subscription accepted.")
                 if self.current_pset:
-                    mid15_data = self.current_pset.rjust(3, '0')
+                    mid15_data = self._build_mid15_data()
                     mid15_msg = build_message(15, rev=1, data=mid15_data)
                     self.send_to_client(mid15_msg)
                     print(f"[Pset] Sent current Pset (MID 0015): {self.current_pset}")
