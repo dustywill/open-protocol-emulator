@@ -396,6 +396,16 @@ class OpenProtocolEmulator:
 
         elif mid_int == 16: print("[Pset] Pset selected acknowledged by client (MID 0016).")
 
+        elif mid_int == 17:
+            if self.pset_subscribed:
+                self.pset_subscribed = False
+                resp = build_message(5, rev=1, data="0017")
+                print("[Pset] Unsubscribed from Pset selection.")
+            else:
+                resp = build_message(4, rev=1, data="001707")
+            self.send_to_client(resp)
+            return
+
         elif mid_int == 50: # MID 0050 VIN download request
             vin = data_field.strip()
             print(f"[VIN] Received VIN download: {vin}")
