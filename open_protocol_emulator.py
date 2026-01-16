@@ -345,205 +345,28 @@ class OpenProtocolEmulator:
 
     def process_message(self, msg: bytes):
         """Parse and dispatch an Open Protocol message."""
-        if len(msg) < 21: print(f"[Error] Malformed message (too short): {msg}"); return
+        if len(msg) < 21:
+            print(f"[Error] Malformed message (too short): {msg}")
+            return
         try:
             mid = msg[4:8].decode('ascii')
             rev = msg[8:11].decode('ascii')
+            no_ack_flag = msg[11:12].decode('ascii')
             data_field = msg[20:-1].decode('ascii')
             mid_int = int(mid)
         except (ValueError, IndexError, UnicodeDecodeError) as e:
-            print(f"[Error] Parse error: {e}, Message: {msg}"); return
-
-        # --- MID Dispatch Logic ---
-        if mid_int == 1: # MID 0001 Communication start
-            if self.session_active: resp = build_message(4, rev=1, data="000196")
-            else:
-                requested_rev = int(rev) if rev.strip() else 1
-                if requested_rev > 1: resp = build_message(4, rev=1, data="000197")
-                else:
-                    cell_id = "0001"; channel_id = "01"
-                    # Use configured controller name here
-                    data = f"01{cell_id}02{channel_id}03{self.controller_name}"
-                    resp = build_message(2, rev=1, data=data)
-                    self.session_active = True
-                    print("[Session] Communication started.")
-                    threading.Thread(target=self.send_tightening_results_loop, daemon=True).start()
-            self.send_to_client(resp)
+            print(f"[Error] Parse error: {e}, Message: {msg}")
             return
 
-        elif mid_int == 3: # MID 0003 Communication stop
-            resp = build_message(5, rev=1, data="0003")
-            self.send_to_client(resp)
-            print("[Session] Communication stop received. Ending session.")
-            self.session_active = False
-            self.vin_subscribed = False; self.result_subscribed = False; self.pset_subscribed = False
-            try:
-                if self.client_socket: self.client_socket.close()
-            except OSError: pass
-            self.client_socket = None
-            return
-
-        elif mid_int == 4: print(f"[Info] Received MID 0004 from client: Data='{data_field}' (ignored).")
-        elif mid_int == 5: print(f"[Info] Received MID 0005 from client: Data='{data_field}' (ignored).")
-        elif mid_int == 9999: 
-            print("[KeepAlive] Received keep-alive message.")
-            resp = build_message(9999, rev=1) 
-            self.send_to_client(resp)
-            print("[KeepAlive] Echo back keep-alive message.")
-            
-
-
-        # --- Tool Control --- Corrected Logic ---
-        elif mid_int == 40: # MID 0040 Disable tool command (Controller -> Client) - Ignore if received
-            print("[Tool] Received Disable Tool Command (MID 0040) from client (unexpected). Ignoring.")
-            return
-        elif mid_int == 41: # MID 0041 Enable tool command (Controller -> Client) - Ignore if received
-            print("[Tool] Received Enable Tool Command (MID 0041) from client (unexpected). Ignoring.")
-            return
-        elif mid_int == 42:  # MID 0042 Disable Tool Request
-            print("[Tool] Received Request Tool Disable (MID 0042).")
-            self.tool_enabled = False
-            resp = build_message(5, rev=1, data="0042")
-            self.send_to_client(resp)
-            notification = build_message(40, rev=1)
-            self.send_to_client(notification)
-            print("[Tool] Tool Disabled. Sent MID 0005 ack and MID 0040 notification.")
-            return
-        elif mid_int == 43:  # MID 0043 Enable Tool Request
-            print("[Tool] Received Request Tool Enable (MID 0043).")
-            self.tool_enabled = True
-            resp = build_message(5, rev=1, data="0043")
-            self.send_to_client(resp)
-            notification = build_message(41, rev=1)
-            self.send_to_client(notification)
-            print("[Tool] Tool Enabled. Sent MID 0005 ack and MID 0041 notification.")
-            return
-        # --- End Tool Control ---
-
-        # (Other MID handlers remain largely the same, ensure they use self.controller_name if needed)
-        elif mid_int == 18: # MID 0018 Select Parameter set
-            pset_id = data_field.strip()
-            if pset_id == "0" or pset_id == "000":
-                self.current_pset = "0"
-                self.pset_last_change = datetime.datetime.now()
-                resp = build_message(5, rev=1, data="0018")
-                print("[Pset] No Pset selected (Pset 0).")
-                if self.pset_subscribed:
-                    mid15_data = self._build_mid15_data()
-                    mid15_msg = build_message(15, rev=1, data=mid15_data)
-                    self.send_to_client(mid15_msg)
-                    print("[Pset] Sent MID 0015: Pset 0")
-            elif pset_id in self.available_psets:
-                self.current_pset = pset_id; self.pset_last_change = datetime.datetime.now()
-                resp = build_message(5, rev=1, data="0018") # Accept
-                print(f"[Pset] Pset {pset_id} selected.")
-                if self.pset_subscribed:
-                    mid15_data = self._build_mid15_data()
-                    mid15_msg = build_message(15, rev=1, data=mid15_data)
-                    self.send_to_client(mid15_msg)
-                    print(f"[Pset] Sent MID 0015: {self.current_pset}")
-            else: resp = build_message(4, rev=1, data="001802") # Error: Pset not found
-            self.send_to_client(resp)
-            return
-
-        elif mid_int == 14: # MID 0014 Parameter set selected subscribe
-            if self.pset_subscribed: resp = build_message(4, rev=1, data="001406") # Error: Subscribed
-            else:
-                self.pset_subscribed = True
-                resp = build_message(5, rev=1, data="0014") # Accept
-                print("[Pset] Pset subscription accepted.")
-                if self.current_pset:
-                    mid15_data = self._build_mid15_data()
-                    mid15_msg = build_message(15, rev=1, data=mid15_data)
-                    self.send_to_client(mid15_msg)
-                    print(f"[Pset] Sent current Pset (MID 0015): {self.current_pset}")
-            self.send_to_client(resp)
-            return
-
-        elif mid_int == 16: print("[Pset] Pset selected acknowledged by client (MID 0016).")
-
-        elif mid_int == 17:
-            if self.pset_subscribed:
-                self.pset_subscribed = False
-                resp = build_message(5, rev=1, data="0017")
-                print("[Pset] Unsubscribed from Pset selection.")
-            else:
-                resp = build_message(4, rev=1, data="001707")
-            self.send_to_client(resp)
-            return
-
-        elif mid_int == 50: # MID 0050 VIN download request
-            vin = data_field.strip()
-            print(f"[VIN] Received VIN download: {vin}")
-            if self._parse_vin(vin):
-                self.current_vin = vin
-                with self.state_lock:
-                    self.batch_counter = 0
-                print("[VIN] Batch counter reset due to new VIN.")
-            resp = build_message(5, rev=1, data="0050") # Accept
-            self.send_to_client(resp)
-            if self.vin_subscribed:
-                vin_param = self.current_vin.ljust(25)[:25]
-                vin_data = build_message(52, rev=1, data=vin_param, no_ack=self.vin_no_ack)
-                self.send_to_client(vin_data)
-                print(f"[VIN] Sent VIN update (MID 0052): {self.current_vin}")
-            return
-
-        elif mid_int == 51: # MID 0051 VIN subscribe
-            no_ack_flag = msg[11:12].decode('ascii')
-            req_rev = int(rev) if rev.strip() else 1
-            if req_rev > 1: resp = build_message(4, rev=1, data="005197") # Error: Revision
-            elif self.vin_subscribed: resp = build_message(4, rev=1, data="005106") # Error: Subscribed
-            else:
-                self.vin_subscribed = True; self.vin_no_ack = (no_ack_flag == "1")
-                resp = build_message(5, rev=1, data="0051") # Accept
-                print("[VIN] Subscription accepted.")
-                if self.current_vin:
-                    vin_param = self.current_vin.ljust(25)[:25]
-                    vin_data = build_message(52, rev=1, data=vin_param, no_ack=self.vin_no_ack)
-                    self.send_to_client(vin_data)
-                    print(f"[VIN] Sent current VIN (MID 0052): {self.current_vin}")
-            self.send_to_client(resp)
-            return
-
-        elif mid_int == 53: print("[VIN] VIN event acknowledged by client (MID 0053).")
-
-        elif mid_int == 54: # MID 0054 VIN unsubscribe
-            if self.vin_subscribed:
-                self.vin_subscribed = False; resp = build_message(5, rev=1, data="0054") # Accept
-                print("[VIN] Unsubscribed from VIN updates.")
-            else: resp = build_message(4, rev=1, data="005407") # Error: Not subscribed
-            self.send_to_client(resp)
-            return
-
-        elif mid_int == 60: # MID 0060 Last tightening result data subscribe
-            no_ack_flag = msg[11:12].decode('ascii')
-            req_rev = int(rev) if rev.strip() else 1
-            if req_rev > 1: resp = build_message(4, rev=1, data="006097") # Error: Revision
-            elif self.result_subscribed: resp = build_message(4, rev=1, data="006009") # Error: Subscribed
-            else:
-                self.result_subscribed = True; self.result_no_ack = (no_ack_flag == "1")
-                resp = build_message(5, rev=1, data="0060") # Accept
-                print("[Tightening] Result subscription accepted.")
-            self.send_to_client(resp)
-            return
-
-        elif mid_int == 62: print("[Tightening] Tightening result acknowledged by client (MID 0062).")
-
-        elif mid_int == 63: # MID 0063 Last tightening result unsubscribe
-            if self.result_subscribed:
-                self.result_subscribed = False; resp = build_message(5, rev=1, data="0063") # Accept
-                print("[Tightening] Unsubscribed from tightening results.")
-            else: resp = build_message(4, rev=1, data="006310") # Error: Not subscribed
-            self.send_to_client(resp)
-            return
-
-        else: # Unsupported MID
-            err_data = f"{mid}{'99'}"; resp = build_message(4, rev=1, data=err_data)
+        # --- MID Dispatch via Registry ---
+        handler = self.mid_handlers.get(mid_int)
+        if handler:
+            handler(mid_int, rev, no_ack_flag, data_field, msg)
+        else:
+            err_data = f"{mid}{'99'}"
+            resp = build_message(4, rev=1, data=err_data)
             self.send_to_client(resp)
             print(f"[Unknown] Received unsupported MID {mid}. Sent error.")
-            return
-        # --- End MID Dispatch Logic ---
 
 
     def send_single_tightening_result(self):
