@@ -16,12 +16,13 @@ None
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Technical Debt Cleanup** - Fix duplicate method, bare excepts, prepare codebase for expansion
+- [x] **Phase 1: Technical Debt Cleanup** - Fix duplicate method, bare excepts, prepare codebase for expansion
 - [ ] **Phase 2: MID Format Audit** - Audit all existing MID implementations against Open Protocol spec
 - [ ] **Phase 3: MID Format Fixes** - Fix spec deviations discovered during audit
-- [ ] **Phase 4: New MID Implementation** - Implement MID 0082, 0100-0102, 0214-0218
-- [ ] **Phase 5: Revision Configuration** - Add per-MID revision levels and controller profiles
-- [ ] **Phase 6: GUI Expansion** - Add revision configuration controls to Tkinter interface
+- [ ] **Phase 4: Multi-Revision Implementation** - Implement revision 2+ response formats for all existing MIDs
+- [ ] **Phase 5: New MID Implementation** - Implement MID 0082, 0100-0102, 0214-0218
+- [ ] **Phase 6: Revision Configuration** - Add per-MID revision levels and controller profiles
+- [ ] **Phase 7: GUI Expansion** - Add revision configuration controls to Tkinter interface
 
 ## Phase Details
 
@@ -39,7 +40,7 @@ Key work:
 
 Plans:
 - [x] 01-01: Fix duplicate method and bare except clauses
-- [ ] 01-02: Thread safety improvements for shared state
+- [x] 01-02: Thread safety improvements for shared state
 
 ### Phase 2: MID Format Audit
 **Goal**: Complete audit report of all MID implementations vs official spec
@@ -76,9 +77,32 @@ Key work:
 Plans:
 - [ ] 03-01: Fix deviations found in audit (specific plans TBD after audit)
 
-### Phase 4: New MID Implementation
-**Goal**: Implement required new MIDs per spec
+### Phase 4: Multi-Revision Implementation
+**Goal**: All existing MIDs support multiple revisions per Open Protocol spec
 **Depends on**: Phase 3
+**Research**: Likely (revision-specific field differences from spec)
+**Research topics**: Open Protocol specification for revision differences per MID - field additions, format changes, data length variations between revisions
+**Plans**: TBD
+
+Key work:
+- Implement revision 2+ formats for MID 0001-0005 (communication)
+- Implement revision 2+ formats for MID 0014-0018 (parameter sets)
+- Implement revision 2+ formats for MID 0042-0043 (tool control)
+- Implement revision 2+ formats for MID 0050-0054 (VIN handling)
+- Implement revision 2+ formats for MID 0060-0063 (tightening results)
+- Remove hardcoded `if requested_rev > 1: reject` patterns
+- Add revision negotiation logic per Open Protocol spec
+
+Plans:
+- [ ] 04-01: Multi-revision support for communication MIDs (0001-0005)
+- [ ] 04-02: Multi-revision support for parameter set MIDs (0014-0018)
+- [ ] 04-03: Multi-revision support for tool control MIDs (0042-0043)
+- [ ] 04-04: Multi-revision support for VIN MIDs (0050-0054)
+- [ ] 04-05: Multi-revision support for tightening result MIDs (0060-0063)
+
+### Phase 5: New MID Implementation
+**Goal**: Implement required new MIDs per spec
+**Depends on**: Phase 4
 **Research**: Likely (new MID specifications)
 **Research topics**: MID 0082 set time format, MID 0100-0102 multi-spindle message structure, MID 0214-0218 I/O and relay formats
 **Plans**: TBD
@@ -90,13 +114,13 @@ Key work:
 - Implement MID 0216-0218 - Relay functions
 
 Plans:
-- [ ] 04-01: Implement MID 0082 (set time)
-- [ ] 04-02: Implement MID 0100-0102 (multi-spindle)
-- [ ] 04-03: Implement MID 0214-0218 (I/O and relay)
+- [ ] 05-01: Implement MID 0082 (set time)
+- [ ] 05-02: Implement MID 0100-0102 (multi-spindle)
+- [ ] 05-03: Implement MID 0214-0218 (I/O and relay)
 
-### Phase 5: Revision Configuration
+### Phase 6: Revision Configuration
 **Goal**: Per-MID revision levels and controller profiles working
-**Depends on**: Phase 4
+**Depends on**: Phase 5
 **Research**: Unlikely (internal architecture, patterns established)
 **Plans**: TBD
 
@@ -107,12 +131,12 @@ Key work:
 - Add profile save/load capability
 
 Plans:
-- [ ] 05-01: Per-MID revision configuration system
-- [ ] 05-02: Controller profiles with presets
+- [ ] 06-01: Per-MID revision configuration system
+- [ ] 06-02: Controller profiles with presets
 
-### Phase 6: GUI Expansion
+### Phase 7: GUI Expansion
 **Goal**: Tkinter GUI controls for revision configuration
-**Depends on**: Phase 5
+**Depends on**: Phase 6
 **Research**: Unlikely (Tkinter patterns established in existing codebase)
 **Plans**: TBD
 
@@ -123,19 +147,20 @@ Key work:
 - Maintain existing GUI functionality
 
 Plans:
-- [ ] 06-01: Revision configuration GUI controls
-- [ ] 06-02: Profile management UI
+- [ ] 07-01: Revision configuration GUI controls
+- [ ] 07-02: Profile management UI
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Technical Debt Cleanup | 1/2 | In progress | - |
+| 1. Technical Debt Cleanup | 2/2 | Complete | 2026-01-16 |
 | 2. MID Format Audit | 0/3 | Not started | - |
 | 3. MID Format Fixes | 0/1 | Not started | - |
-| 4. New MID Implementation | 0/3 | Not started | - |
-| 5. Revision Configuration | 0/2 | Not started | - |
-| 6. GUI Expansion | 0/2 | Not started | - |
+| 4. Multi-Revision Implementation | 0/5 | Not started | - |
+| 5. New MID Implementation | 0/3 | Not started | - |
+| 6. Revision Configuration | 0/2 | Not started | - |
+| 7. GUI Expansion | 0/2 | Not started | - |
