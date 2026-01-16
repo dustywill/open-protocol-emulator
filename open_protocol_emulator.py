@@ -181,10 +181,59 @@ class OpenProtocolEmulator:
         resp = build_message(9999, rev=1)
         self.send_to_client(resp)
         print("[KeepAlive] Echo back keep-alive message.")
-    def _handle_mid_0014(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0016(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0017(self, mid_int, rev, no_ack_flag, data_field, msg): pass
-    def _handle_mid_0018(self, mid_int, rev, no_ack_flag, data_field, msg): pass
+    # === Parameter Set MID Handlers ===
+
+    def _handle_mid_0014(self, mid_int, rev, no_ack_flag, data_field, msg):
+        if self.pset_subscribed:
+            resp = build_message(4, rev=1, data="001406")
+        else:
+            self.pset_subscribed = True
+            resp = build_message(5, rev=1, data="0014")
+            print("[Pset] Pset subscription accepted.")
+            if self.current_pset:
+                mid15_data = self._build_mid15_data()
+                mid15_msg = build_message(15, rev=1, data=mid15_data)
+                self.send_to_client(mid15_msg)
+                print(f"[Pset] Sent current Pset (MID 0015): {self.current_pset}")
+        self.send_to_client(resp)
+
+    def _handle_mid_0016(self, mid_int, rev, no_ack_flag, data_field, msg):
+        print("[Pset] Pset selected acknowledged by client (MID 0016).")
+
+    def _handle_mid_0017(self, mid_int, rev, no_ack_flag, data_field, msg):
+        if self.pset_subscribed:
+            self.pset_subscribed = False
+            resp = build_message(5, rev=1, data="0017")
+            print("[Pset] Unsubscribed from Pset selection.")
+        else:
+            resp = build_message(4, rev=1, data="001707")
+        self.send_to_client(resp)
+
+    def _handle_mid_0018(self, mid_int, rev, no_ack_flag, data_field, msg):
+        pset_id = data_field.strip()
+        if pset_id == "0" or pset_id == "000":
+            self.current_pset = "0"
+            self.pset_last_change = datetime.datetime.now()
+            resp = build_message(5, rev=1, data="0018")
+            print("[Pset] No Pset selected (Pset 0).")
+            if self.pset_subscribed:
+                mid15_data = self._build_mid15_data()
+                mid15_msg = build_message(15, rev=1, data=mid15_data)
+                self.send_to_client(mid15_msg)
+                print("[Pset] Sent MID 0015: Pset 0")
+        elif pset_id in self.available_psets:
+            self.current_pset = pset_id
+            self.pset_last_change = datetime.datetime.now()
+            resp = build_message(5, rev=1, data="0018")
+            print(f"[Pset] Pset {pset_id} selected.")
+            if self.pset_subscribed:
+                mid15_data = self._build_mid15_data()
+                mid15_msg = build_message(15, rev=1, data=mid15_data)
+                self.send_to_client(mid15_msg)
+                print(f"[Pset] Sent MID 0015: {self.current_pset}")
+        else:
+            resp = build_message(4, rev=1, data="001802")
+        self.send_to_client(resp)
     # === Tool Control MID Handlers ===
 
     def _handle_mid_0040(self, mid_int, rev, no_ack_flag, data_field, msg):
