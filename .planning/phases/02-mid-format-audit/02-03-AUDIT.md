@@ -144,3 +144,76 @@ data = "".join([f"{pid}{pval}" for pid, pval in params.items()])
 
 ---
 
+## MID 0061 - Last Tightening Result Data (Fields 12-23)
+
+### Spec Reference
+Open Protocol R2.8.0, Table 76 - MID 0061 Rev 1 field structure (continued).
+
+**Revision 1 Field Structure (Fields 12-23):**
+```
+Field 12: Torque min limit - 6 digits (value x 100, e.g., 4700 = 47.00 Nm)
+Field 13: Torque max limit - 6 digits (value x 100)
+Field 14: Torque final target - 6 digits (value x 100)
+Field 15: Torque - 6 digits (actual value x 100)
+Field 16: Angle min - 5 digits (degrees)
+Field 17: Angle max - 5 digits (degrees)
+Field 18: Final angle target - 5 digits (degrees)
+Field 19: Angle - 5 digits (actual degrees)
+Field 20: Timestamp - 19 chars (YYYY-MM-DD:HH:MM:SS)
+Field 21: Last change in parameter set - 19 chars (timestamp)
+Field 22: Batch status - 1 digit (0=Not used, 1=OK, 2=NOK)
+Field 23: Tightening ID - 10 digits
+```
+
+### Current Implementation (Lines 551-556)
+
+```python
+"12": f"{int(torque_min*100):06d}", "13": f"{int(torque_max*100):06d}",
+"14": f"{int(target_torque*100):06d}", "15": f"{int(actual_torque*100):06d}",
+"16": f"{int(angle_min):05d}", "17": f"{int(angle_max):05d}",
+"18": f"{int(target_angle):05d}", "19": f"{int(actual_angle):05d}",
+"20": timestamp_str, "21": pset_change_ts, "22": batch_status,
+"23": tightening_id_str
+```
+
+### Field-by-Field Audit (12-23)
+
+| Field | Spec | Current Implementation | Status | Notes |
+|-------|------|----------------------|--------|-------|
+| 12 Torque min | 6 digits x100, prefix "12" | `int(torque_min*100):06d` | OK | Scaling and format correct |
+| 13 Torque max | 6 digits x100, prefix "13" | `int(torque_max*100):06d` | OK | Scaling and format correct |
+| 14 Torque target | 6 digits x100, prefix "14" | `int(target_torque*100):06d` | OK | Scaling and format correct |
+| 15 Torque actual | 6 digits x100, prefix "15" | `int(actual_torque*100):06d` | OK | Scaling and format correct |
+| 16 Angle min | 5 digits, prefix "16" | `int(angle_min):05d` | OK | Format correct |
+| 17 Angle max | 5 digits, prefix "17" | `int(angle_max):05d` | OK | Format correct |
+| 18 Angle target | 5 digits, prefix "18" | `int(target_angle):05d` | OK | Format correct |
+| 19 Angle actual | 5 digits, prefix "19" | `int(actual_angle):05d` | OK | Format correct |
+| 20 Timestamp | 19 chars YYYY-MM-DD:HH:MM:SS | `strftime("%Y-%m-%d:%H:%M:%S")` | OK | Format matches spec exactly |
+| 21 Pset change time | 19 chars timestamp | `pset_change_ts` | OK | Same format as field 20 |
+| 22 Batch status | 1 digit (0/1/2) | `batch_status` | **Minor** | Value 2 (NOK) never generated |
+| 23 Tightening ID | 10 digits | `f"{...}:04d"` (4 digits) | **Major** | Should be 10 digits, not 4 |
+
+### Deviations Found (Fields 12-23)
+
+| ID | Field/Feature | Spec | Current | Severity | Notes |
+|----|--------------|------|---------|----------|-------|
+| 0061-D5 | Field 23 Tightening ID | 10 digits | 4 digits (`{:04d}`) | **Major** | Field length incorrect |
+| 0061-D6 | Field 22 Batch status | Values 0/1/2 | Only 0/1 used | **Minor** | Never generates batch NOK (2) |
+| 0061-D7 | Torque scaling | Truncate (int) | Uses `int()` | OK | Matches spec (truncate, not round) |
+
+### Scaling Factor Verification
+
+| Field | Spec Scaling | Current | Result |
+|-------|-------------|---------|--------|
+| Torque fields (12-15) | x100 | `int(val*100)` | Correct |
+| Angle fields (16-19) | None (raw degrees) | `int(val)` | Correct |
+
+### Timestamp Format Verification
+
+**Spec:** `YYYY-MM-DD:HH:MM:SS` (19 characters)
+**Current:** `strftime("%Y-%m-%d:%H:%M:%S")`
+
+Example output: `2026-01-16:14:30:45` (19 characters) - **Correct**
+
+---
+
