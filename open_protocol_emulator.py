@@ -33,6 +33,14 @@ def build_message(mid: int, rev: int = 1, data: str = "", no_ack: bool = False,
     return message.encode('ascii')
 
 class OpenProtocolEmulator:
+    # Maximum supported revision per MID
+    MAX_REV_0002 = 6
+    MAX_REV_0004 = 3
+    MAX_REV_0015 = 2
+    MAX_REV_0041 = 5
+    MAX_REV_0052 = 2
+    MAX_REV_0061 = 7
+
     # Added port and name to constructor with defaults
     def __init__(self, host='0.0.0.0', port=4545, controller_name="OpenProtocolSim"):
         self.host = host
@@ -69,6 +77,22 @@ class OpenProtocolEmulator:
         self.client_socket = None
         self.send_lock = threading.Lock()
         self.tightening_id_counter = 0
+
+        # --- Controller Info for MID 0002 Revisions 2+ ---
+        self.supplier_code = 1
+        self.op_version = "2.8.0              "
+        self.ctrl_sw_version = "1.0.0              "
+        self.tool_sw_version = "1.0.0              "
+        self.rbu_type = "                        "
+        self.ctrl_serial = "SN12345678"
+        self.system_type = "PF6000    "
+        self.system_subtype = "          "
+        self.seq_num_support = 0
+        self.link_support = 0
+        self.station_id = "0001      "
+        self.station_name = "Station                  "
+        self.client_id = 1
+        # --- End Controller Info ---
 
         # --- Pset Parameters Storage ---
         self.pset_parameters = {}
@@ -135,6 +159,19 @@ class OpenProtocolEmulator:
             62: self._handle_mid_0062,
             63: self._handle_mid_0063,
         }
+
+    def _get_response_revision(self, mid: int, requested_rev: int) -> int:
+        """Return highest supported revision <= requested."""
+        max_supported = {
+            2: self.MAX_REV_0002,
+            4: self.MAX_REV_0004,
+            15: self.MAX_REV_0015,
+            41: self.MAX_REV_0041,
+            52: self.MAX_REV_0052,
+            61: self.MAX_REV_0061,
+        }
+        max_rev = max_supported.get(mid, 1)
+        return min(requested_rev, max_rev)
 
     # === Communication MID Handlers ===
 
