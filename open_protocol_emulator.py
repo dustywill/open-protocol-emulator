@@ -33,16 +33,6 @@ def build_message(mid: int, rev: int = 1, data: str = "", no_ack: bool = False,
     return message.encode('ascii')
 
 class OpenProtocolEmulator:
-    # Maximum supported revision per MID
-    MAX_REV_0002 = 6
-    MAX_REV_0004 = 3
-    MAX_REV_0015 = 2
-    MAX_REV_0041 = 5
-    MAX_REV_0052 = 2
-    MAX_REV_0061 = 7
-    MAX_REV_0101 = 5
-    MAX_REV_0215 = 2
-
     # Added port and name to constructor with defaults
     def __init__(self, host='0.0.0.0', port=4545, controller_name="OpenProtocolSim"):
         self.host = host
@@ -249,16 +239,8 @@ class OpenProtocolEmulator:
 
     def _get_response_revision(self, mid: int, requested_rev: int) -> int:
         """Return highest supported revision <= requested."""
-        max_supported = {
-            2: self.MAX_REV_0002,
-            4: self.MAX_REV_0004,
-            15: self.MAX_REV_0015,
-            41: self.MAX_REV_0041,
-            52: self.MAX_REV_0052,
-            61: self.MAX_REV_0061,
-        }
-        max_rev = max_supported.get(mid, 1)
-        return min(requested_rev, max_rev)
+        max_supported = self.revision_config.get(mid, 1)
+        return min(requested_rev, max_supported)
 
     def _build_mid0002_data(self, revision: int) -> str:
         """Build MID 0002 response data for given revision (1-6)."""
@@ -547,10 +529,10 @@ class OpenProtocolEmulator:
         """MID 0100: Multi-spindle result subscribe (Rev 1-5)."""
         req_rev = int(rev.strip()) if rev.strip() else 1
 
-        if req_rev > self.MAX_REV_0101:
+        if req_rev > self.revision_config.get(101, 1):
             error_data = self._build_mid0004_data(1, 100, 97)
             resp = build_message(4, rev=1, data=error_data)
-            print(f"[MultiSpindle] Revision {req_rev} not supported (max: {self.MAX_REV_0101}).")
+            print(f"[MultiSpindle] Revision {req_rev} not supported (max: {self.revision_config.get(101, 1)}).")
         elif self.multi_spindle_subscribed:
             error_data = self._build_mid0004_data(1, 100, 9)
             resp = build_message(4, rev=1, data=error_data)
@@ -596,7 +578,7 @@ class OpenProtocolEmulator:
         device_num = data_field[:2] if len(data_field) >= 2 else "00"
         req_rev = int(rev.strip()) if rev.strip() else 1
 
-        if req_rev > self.MAX_REV_0215:
+        if req_rev > self.revision_config.get(215, 1):
             error_data = self._build_mid0004_data(1, 214, 97)
             resp = build_message(4, rev=1, data=error_data)
             print(f"[IO] Revision {req_rev} not supported for MID 0214.")
