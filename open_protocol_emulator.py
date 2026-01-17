@@ -278,6 +278,29 @@ class OpenProtocolEmulator:
         """Get a copy of the full revision configuration."""
         return dict(self.revision_config)
 
+    def apply_profile(self, profile_name: str) -> None:
+        """Apply a controller profile by name."""
+        if profile_name not in self.DEFAULT_PROFILES:
+            raise ValueError(f"Unknown profile: {profile_name}. Available: {list(self.DEFAULT_PROFILES.keys())}")
+
+        profile = self.DEFAULT_PROFILES[profile_name]
+        self.revision_config.update(profile["revisions"])
+        self.current_profile = profile_name
+
+    def get_current_profile(self) -> str:
+        """Get the name of the currently active profile."""
+        return self.current_profile
+
+    def get_available_profiles(self) -> list:
+        """Get list of available profile names."""
+        return list(self.DEFAULT_PROFILES.keys())
+
+    def get_profile_description(self, profile_name: str) -> str:
+        """Get the description of a profile."""
+        if profile_name not in self.DEFAULT_PROFILES:
+            return "Unknown profile"
+        return self.DEFAULT_PROFILES[profile_name]["description"]
+
     def _build_mid0002_data(self, revision: int) -> str:
         """Build MID 0002 response data for given revision (1-6)."""
         fields = []
