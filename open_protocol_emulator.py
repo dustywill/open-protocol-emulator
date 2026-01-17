@@ -113,6 +113,21 @@ class OpenProtocolEmulator:
         }
         self.relay_subscriptions = {}
         # --- End I/O Device and Relay State ---
+
+        # --- Revision Configuration ---
+        # Maps MID numbers to their maximum supported revision.
+        # This enables runtime configuration of revision limits without code changes.
+        self.revision_config = {
+            2: 6,     # MID 0002 - Communication start ack
+            4: 3,     # MID 0004 - Communication negative ack
+            15: 2,    # MID 0015 - Pset selected
+            41: 5,    # MID 0041 - Tool data reply
+            52: 2,    # MID 0052 - VIN number
+            61: 7,    # MID 0061 - Tightening result
+            101: 5,   # MID 0101 - Multi-spindle result
+            215: 2,   # MID 0215 - I/O device status reply
+        }
+        # --- End Revision Configuration ---
         # Extended tightening result data (for MID 0061 rev 3+)
         self.strategy_code = 0
         self.strategy_options = "00000"
