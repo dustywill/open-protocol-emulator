@@ -33,6 +33,27 @@ def build_message(mid: int, rev: int = 1, data: str = "", no_ack: bool = False,
     return message.encode('ascii')
 
 class OpenProtocolEmulator:
+    DEFAULT_PROFILES = {
+        "legacy": {
+            "description": "Legacy mode - revision 1 only for all MIDs",
+            "revisions": {
+                2: 1, 4: 1, 15: 1, 41: 1, 52: 1, 61: 1, 101: 1, 215: 1
+            }
+        },
+        "pf6000-basic": {
+            "description": "PF6000 basic - moderate revision support",
+            "revisions": {
+                2: 3, 4: 2, 15: 1, 41: 2, 52: 1, 61: 2, 101: 2, 215: 1
+            }
+        },
+        "pf6000-full": {
+            "description": "PF6000 full - maximum revision support",
+            "revisions": {
+                2: 6, 4: 3, 15: 2, 41: 5, 52: 2, 61: 7, 101: 5, 215: 2
+            }
+        }
+    }
+
     # Added port and name to constructor with defaults
     def __init__(self, host='0.0.0.0', port=4545, controller_name="OpenProtocolSim"):
         self.host = host
@@ -117,6 +138,7 @@ class OpenProtocolEmulator:
             101: 5,   # MID 0101 - Multi-spindle result
             215: 2,   # MID 0215 - I/O device status reply
         }
+        self.current_profile = "pf6000-full"  # Default profile name
         # --- End Revision Configuration ---
         # Extended tightening result data (for MID 0061 rev 3+)
         self.strategy_code = 0
