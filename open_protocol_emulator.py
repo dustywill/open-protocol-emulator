@@ -242,6 +242,20 @@ class OpenProtocolEmulator:
         max_supported = self.revision_config.get(mid, 1)
         return min(requested_rev, max_supported)
 
+    def get_max_revision(self, mid: int) -> int:
+        """Get the maximum supported revision for a MID."""
+        return self.revision_config.get(mid, 1)
+
+    def set_max_revision(self, mid: int, max_rev: int) -> None:
+        """Set the maximum supported revision for a MID."""
+        if max_rev < 1:
+            raise ValueError(f"Revision must be >= 1, got {max_rev}")
+        self.revision_config[mid] = max_rev
+
+    def get_all_revision_config(self) -> dict:
+        """Get a copy of the full revision configuration."""
+        return dict(self.revision_config)
+
     def _build_mid0002_data(self, revision: int) -> str:
         """Build MID 0002 response data for given revision (1-6)."""
         fields = []
