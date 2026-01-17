@@ -5,7 +5,14 @@
       "Bash(Select-Object Name, Length)",
       "Read(//c/Users/byron/Downloads/OP/**)",
       "Bash(timeout 3 python:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(where:*)",
+      "Bash(py -3 -m pip show:*)",
+      "Bash(py -3 -m pip install customtkinter)",
+      "Bash(py -3:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git tag -a v1.0 -m \"$\\(cat <<''EOF''\nv1.0 PF6000 Expansion\n\nDelivered: Spec-compliant, configurable PF6000 simulator with multi-revision support, new MIDs, and GUI-based revision configuration.\n\nKey accomplishments:\n- Fixed technical debt \\(duplicate methods, bare excepts, thread safety\\)\n- Audited and fixed all existing MIDs against Open Protocol spec\n- Refactored process_message\\(\\) to registry-based dispatch\n- Implemented multi-revision support for all MIDs \\(revisions 1-7\\)\n- Added new MIDs: 0082, 0100-0103, 0214-0219\n- Added per-MID revision configuration with controller profiles\n- Added GUI controls for revision configuration and profile management\n\nStats: 8 phases, 19 plans, 2,091 lines Python, 2 days\n\nSee .planning/MILESTONES.md for full details.\nEOF\n\\)\")",
+      "Bash(git push:*)"
     ]
   }
 }

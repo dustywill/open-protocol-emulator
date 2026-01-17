@@ -5,7 +5,8 @@ import time
 import datetime
 import random
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import messagebox, filedialog
+import customtkinter as ctk
 import re
 import argparse
 import os
@@ -37,23 +38,44 @@ def build_message(mid: int, rev: int = 1, data: str = "", no_ack: bool = False,
     return message.encode('ascii')
 
 class OpenProtocolEmulator:
+    DEFAULT_RELAY_MAPPINGS = {
+        "trigger": 20,
+        "forward": 21,
+        "reverse": 22,
+    }
+
     DEFAULT_PROFILES = {
         "legacy": {
             "description": "Legacy mode - revision 1 only for all MIDs",
             "revisions": {
                 2: 1, 4: 1, 15: 1, 41: 1, 52: 1, 61: 1, 101: 1, 215: 1
+            },
+            "relay_mappings": {
+                "trigger": 20,
+                "forward": 21,
+                "reverse": 22,
             }
         },
         "pf6000-basic": {
             "description": "PF6000 basic - moderate revision support",
             "revisions": {
                 2: 3, 4: 2, 15: 1, 41: 2, 52: 1, 61: 2, 101: 2, 215: 1
+            },
+            "relay_mappings": {
+                "trigger": 20,
+                "forward": 21,
+                "reverse": 22,
             }
         },
         "pf6000-full": {
             "description": "PF6000 full - maximum revision support",
             "revisions": {
                 2: 6, 4: 3, 15: 2, 41: 5, 52: 2, 61: 7, 101: 5, 215: 2
+            },
+            "relay_mappings": {
+                "trigger": 20,
+                "forward": 21,
+                "reverse": 22,
             }
         }
     }
@@ -109,10 +131,10 @@ class OpenProtocolEmulator:
                     {"function": 2, "status": 0},
                     {"function": 9, "status": 0},
                     {"function": 10, "status": 0},
-                    {"function": 18, "status": 1},
-                    {"function": 19, "status": 1},
+                    {"function": 20, "status": 0},
+                    {"function": 21, "status": 1},
+                    {"function": 22, "status": 0},
                     {"function": 30, "status": 0},
-                    {"function": 0, "status": 0},
                 ],
                 "digital_inputs": [
                     {"function": 0, "status": 0},
@@ -143,6 +165,7 @@ class OpenProtocolEmulator:
             215: 2,   # MID 0215 - I/O device status reply
         }
         self.current_profile = "pf6000-full"  # Default profile name
+        self.relay_mappings = self.DEFAULT_RELAY_MAPPINGS.copy()
         # --- End Revision Configuration ---
         # Extended tightening result data (for MID 0061 rev 3+)
         self.strategy_code = 0
@@ -282,11 +305,23 @@ class OpenProtocolEmulator:
         """Get a copy of the full revision configuration."""
         return dict(self.revision_config)
 
+    def _ensure_relay_functions_exist(self):
+        """Ensure all mapped relay functions exist in io_devices."""
+        for device in self.io_devices.values():
+            existing_functions = {r["function"] for r in device["relays"]}
+            for relay_name, relay_func in self.relay_mappings.items():
+                if relay_func not in existing_functions:
+                    device["relays"].append({"function": relay_func, "status": 0})
+                    print(f"[Relay] Added relay function {relay_func} ({relay_name}) to device")
+
     def apply_profile(self, profile_name: str) -> None:
         """Apply a controller profile by name (built-in or from controllers folder)."""
         if profile_name in self.DEFAULT_PROFILES:
             profile = self.DEFAULT_PROFILES[profile_name]
             self.revision_config.update(profile["revisions"])
+            if "relay_mappings" in profile:
+                self.relay_mappings.update(profile["relay_mappings"])
+                self._ensure_relay_functions_exist()
             self.current_profile = profile_name
             return
 
@@ -356,6 +391,10 @@ class OpenProtocolEmulator:
         for mid_str, rev in profile_data["revisions"].items():
             mid = int(mid_str)
             self.revision_config[mid] = rev
+
+        if "relay_mappings" in profile_data:
+            self.relay_mappings.update(profile_data["relay_mappings"])
+            self._ensure_relay_functions_exist()
 
         profile_name = profile_data.get("name", "custom")
         self.current_profile = profile_name
@@ -844,8 +883,8 @@ class OpenProtocolEmulator:
 
     def _get_pset_filename(self, controller_name):
         """Generates the filename for Pset parameters based on controller name."""
-        # Sanitize the controller name to be safe for filenames
-        safe_name = re.sub(r'[^\w.-]', '_', controller_name)
+        # Sanitize the controller name to be safe for filenames (strip padding first)
+        safe_name = re.sub(r'[^\w.-]', '_', controller_name.strip())
         return f"pset_parameters_{safe_name}.json"
 
 
@@ -875,8 +914,9 @@ class OpenProtocolEmulator:
         import json
         filename = self._get_pset_filename(controller_name)
         try:
+            sorted_params = dict(sorted(self.pset_parameters.items()))
             with open(filename, 'w') as f:
-                json.dump(self.pset_parameters, f, indent=4)
+                json.dump(sorted_params, f, indent=4)
             print(f"[Pset Params] Saved parameters to {filename}")
         except Exception as e:
             print(f"[Pset Params] Error saving parameters to {filename}: {e}")
@@ -1381,143 +1421,38 @@ class OpenProtocolEmulator:
 
 
     def start_gui(self):
-        """Start Tkinter GUI with tabbed configuration and persistent status/log panels."""
+        """Start CustomTkinter GUI with tabbed configuration and persistent status/log panels."""
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")
+
         window_title = f"{self.controller_name.strip()} (Port: {self.port})"
-        root = tk.Tk()
+        root = ctk.CTk()
         root.title(window_title)
-        root.geometry("1100x700")
-        root.minsize(900, 600)
-        root.configure(bg="#1a1a2e")
+        root.geometry("1200x800")
+        root.minsize(1000, 700)
 
-        style = ttk.Style()
-        style.theme_use('clam')
-
-        style.configure(".",
-            background="#1a1a2e",
-            foreground="#e8e8e8",
-            fieldbackground="#16213e",
-            font=("Consolas", 9))
-
-        style.configure("TNotebook",
-            background="#1a1a2e",
-            borderwidth=0,
-            padding=0)
-        style.configure("TNotebook.Tab",
-            background="#16213e",
-            foreground="#8892b0",
-            padding=[16, 8],
-            font=("Consolas", 10, "bold"))
-        style.map("TNotebook.Tab",
-            background=[("selected", "#0f3460"), ("active", "#1a1a2e")],
-            foreground=[("selected", "#00d9ff"), ("active", "#e8e8e8")],
-            expand=[("selected", [0, 0, 0, 2])])
-
-        style.configure("TFrame", background="#1a1a2e")
-        style.configure("TLabel", background="#1a1a2e", foreground="#e8e8e8", font=("Consolas", 9))
-        style.configure("TButton",
-            background="#0f3460",
-            foreground="#00d9ff",
-            borderwidth=1,
-            focuscolor="#00d9ff",
-            font=("Consolas", 9, "bold"),
-            padding=[12, 6])
-        style.map("TButton",
-            background=[("active", "#1a4a7a"), ("pressed", "#00d9ff")],
-            foreground=[("pressed", "#1a1a2e")])
-
-        style.configure("TEntry",
-            fieldbackground="#16213e",
-            foreground="#e8e8e8",
-            insertcolor="#00d9ff",
-            borderwidth=1,
-            padding=[4, 4])
-
-        style.configure("TSpinbox",
-            fieldbackground="#16213e",
-            foreground="#e8e8e8",
-            arrowcolor="#00d9ff",
-            borderwidth=1)
-
-        style.configure("TCombobox",
-            fieldbackground="#16213e",
-            foreground="#e8e8e8",
-            arrowcolor="#00d9ff",
-            selectbackground="#0f3460",
-            selectforeground="#00d9ff")
-        style.map("TCombobox",
-            fieldbackground=[("readonly", "#16213e")],
-            selectbackground=[("readonly", "#0f3460")])
-
-        style.configure("TCheckbutton",
-            background="#1a1a2e",
-            foreground="#e8e8e8",
-            indicatorcolor="#16213e",
-            indicatorrelief="flat",
-            font=("Consolas", 9))
-        style.map("TCheckbutton",
-            indicatorcolor=[("selected", "#00d9ff"), ("active", "#0f3460")])
-
-        style.configure("TLabelframe",
-            background="#1a1a2e",
-            foreground="#00d9ff",
-            bordercolor="#0f3460",
-            relief="solid",
-            borderwidth=1)
-        style.configure("TLabelframe.Label",
-            background="#1a1a2e",
-            foreground="#00d9ff",
-            font=("Consolas", 10, "bold"))
-
-        style.configure("Status.TLabel",
-            background="#0f3460",
-            foreground="#e8e8e8",
-            font=("Consolas", 9),
-            padding=[8, 4])
-        style.configure("StatusValue.TLabel",
-            background="#0f3460",
-            foreground="#00d9ff",
-            font=("Consolas", 10, "bold"),
-            padding=[8, 4])
-        style.configure("StatusOK.TLabel",
-            background="#0f3460",
-            foreground="#00ff88",
-            font=("Consolas", 10, "bold"),
-            padding=[8, 4])
-        style.configure("StatusWarn.TLabel",
-            background="#0f3460",
-            foreground="#ffaa00",
-            font=("Consolas", 10, "bold"),
-            padding=[8, 4])
-        style.configure("StatusError.TLabel",
-            background="#0f3460",
-            foreground="#ff4757",
-            font=("Consolas", 10, "bold"),
-            padding=[8, 4])
-
-        style.configure("Control.TButton",
-            background="#16213e",
-            foreground="#e8e8e8",
-            font=("Consolas", 9),
-            padding=[10, 6])
-        style.map("Control.TButton",
-            background=[("active", "#1a4a7a"), ("pressed", "#00d9ff")],
-            foreground=[("pressed", "#1a1a2e")])
-
-        style.configure("Primary.TButton",
-            background="#0f3460",
-            foreground="#00d9ff",
-            font=("Consolas", 10, "bold"),
-            padding=[14, 8])
-        style.map("Primary.TButton",
-            background=[("active", "#1a4a7a"), ("pressed", "#00d9ff")],
-            foreground=[("pressed", "#1a1a2e")])
+        COLORS = {
+            "bg_dark": "#0a0e14",
+            "bg_main": "#101720",
+            "bg_card": "#1a2332",
+            "bg_input": "#0d1117",
+            "accent": "#00b4d8",
+            "accent_hover": "#0096c7",
+            "accent_dim": "#023e8a",
+            "success": "#00f5a0",
+            "warning": "#ffc107",
+            "error": "#ff5757",
+            "text": "#e6edf3",
+            "text_dim": "#7d8590",
+            "border": "#30363d",
+        }
 
         vin_var = tk.StringVar(value=self.current_vin)
         batch_size_var = tk.StringVar(value=str(self.target_batch_size))
         nok_prob_var = tk.StringVar(value=str(int(self.nok_probability * 100)))
         auto_loop_interval_var = tk.StringVar(value=str(self.auto_loop_interval))
         auto_send_loop_status_var = tk.StringVar(value="ACTIVE")
-        pset_display_var = tk.StringVar(value="Not set")
+        pset_display_var = tk.StringVar(value="---")
         conn_display_var = tk.StringVar(value="DISCONNECTED")
         batch_display_var = tk.StringVar(value=f"{self.batch_counter}/{self.target_batch_size}")
         vin_display_var = tk.StringVar(value=self.current_vin)
@@ -1551,6 +1486,15 @@ class OpenProtocolEmulator:
         last_result_torque_var = tk.StringVar(value="---")
         last_result_angle_var = tk.StringVar(value="---")
         last_result_id_var = tk.StringVar(value="---")
+
+        relay_direction_var = tk.BooleanVar(value=False)
+        relay_trigger_var = tk.BooleanVar(value=False)
+
+        sub_vin_var = tk.StringVar(value="---")
+        sub_pset_var = tk.StringVar(value="---")
+        sub_result_var = tk.StringVar(value="---")
+        sub_multi_var = tk.StringVar(value="---")
+        sub_relay_var = tk.StringVar(value="---")
 
         def parse_mid_fields(mid: str, data: str) -> str:
             """Parse known MID data into human-readable field breakdown."""
@@ -1742,7 +1686,9 @@ class OpenProtocolEmulator:
                 auto_loop_interval_var.set(str(self.auto_loop_interval))
 
         def load_pset_settings():
-            selected_pset = pset_id_var.get()
+            selected_pset = pset_id_var.get().strip()
+            if not selected_pset:
+                return
             if selected_pset in self.pset_parameters:
                 params = self.pset_parameters[selected_pset]
                 pset_batch_size_var.set(str(params["batch_size"]))
@@ -1787,9 +1733,16 @@ class OpenProtocolEmulator:
 
 
                 self.pset_parameters[selected_pset] = new_params
+                self.current_pset = selected_pset
+                self.pset_last_change = datetime.datetime.now()
                 print(f"[GUI] Applied settings for Pset {selected_pset}: {new_params}")
                 self._save_pset_parameters(self.controller_name) # Save immediately after applying, passing controller name
-                messagebox.showinfo("Success", f"Settings applied for Pset {selected_pset}")
+                if self.pset_subscribed:
+                    mid15_data = self._build_mid0015_data(self.pset_subscribed_rev)
+                    mid15_msg = build_message(15, rev=self.pset_subscribed_rev, data=mid15_data)
+                    self.send_to_client(mid15_msg)
+                    print(f"[Pset] Sent MID 0015 rev {self.pset_subscribed_rev}: {self.current_pset}")
+                messagebox.showinfo("Success", f"Settings applied and Pset {selected_pset} selected")
 
             except ValueError as e:
                 messagebox.showerror("Error", f"Invalid number format or value: {e}")
@@ -1805,6 +1758,29 @@ class OpenProtocolEmulator:
         def manual_send_result():
             threading.Thread(target=self.send_single_tightening_result, daemon=True).start()
 
+        def toggle_relay(relay_function: int, new_status: int):
+            for device in self.io_devices.values():
+                for relay in device["relays"]:
+                    if relay["function"] == relay_function:
+                        relay["status"] = new_status
+                        print(f"[Relay] Set relay function {relay_function} to {'ON' if new_status else 'OFF'}")
+                        if relay_function in self.relay_subscriptions:
+                            self._send_relay_status(relay_function)
+                        return
+            print(f"[Relay] Relay function {relay_function} not found in any device")
+
+        def on_direction_toggle():
+            is_forward = relay_direction_var.get()
+            fwd_relay = self.relay_mappings.get("forward", 21)
+            rev_relay = self.relay_mappings.get("reverse", 22)
+            toggle_relay(fwd_relay, 1 if is_forward else 0)
+            toggle_relay(rev_relay, 0 if is_forward else 1)
+
+        def on_trigger_toggle():
+            new_status = 1 if relay_trigger_var.get() else 0
+            trigger_relay = self.relay_mappings.get("trigger", 20)
+            toggle_relay(trigger_relay, new_status)
+
         def update_labels():
             pset_display_var.set(self.current_pset if self.current_pset else "---")
             conn_display_var.set("CONNECTED" if self.session_active else "DISCONNECTED")
@@ -1815,16 +1791,26 @@ class OpenProtocolEmulator:
             vin_display_var.set(self.current_vin)
             tool_protocol_status_var.set("ENABLED" if self.tool_enabled else "DISABLED")
 
-            conn_label.configure(style="StatusOK.TLabel" if self.session_active else "StatusError.TLabel")
-            tool_label.configure(style="StatusOK.TLabel" if self.tool_enabled else "StatusWarn.TLabel")
+            sub_vin_var.set("YES" if self.vin_subscribed else "---")
+            sub_pset_var.set("YES" if self.pset_subscribed else "---")
+            sub_result_var.set("YES" if self.result_subscribed else "---")
+            sub_multi_var.set("YES" if self.multi_spindle_subscribed else "---")
+            relay_count = len(self.relay_subscriptions)
+            sub_relay_var.set(f"{relay_count}" if relay_count > 0 else "---")
+
+            conn_label.configure(text_color=COLORS["success"] if self.session_active else COLORS["error"])
+            tool_label.configure(text_color=COLORS["success"] if self.tool_enabled else COLORS["warning"])
+
+            for lbl, subscribed in sub_labels:
+                lbl.configure(text_color=COLORS["success"] if subscribed() else COLORS["text_dim"])
 
             result_status = last_result_status_var.get()
             if result_status == "OK":
-                result_status_label.configure(style="StatusOK.TLabel")
+                result_status_label.configure(text_color=COLORS["success"])
             elif result_status == "NOK":
-                result_status_label.configure(style="StatusError.TLabel")
+                result_status_label.configure(text_color=COLORS["error"])
             else:
-                result_status_label.configure(style="StatusValue.TLabel")
+                result_status_label.configure(text_color=COLORS["text"])
 
             try:
                 root.after(500, update_labels)
@@ -1906,7 +1892,7 @@ class OpenProtocolEmulator:
 
         def refresh_profile_dropdown():
             """Refresh the profile dropdown with current available profiles."""
-            profile_menu['values'] = self.get_available_profiles()
+            profile_menu.configure(values=self.get_available_profiles())
 
         def save_profile_dialog():
             """Open dialog to save current settings as a new profile."""
@@ -1919,20 +1905,23 @@ class OpenProtocolEmulator:
             self.set_max_revision(101, int(rev_mid_0101_var.get()))
             self.set_max_revision(215, int(rev_mid_0215_var.get()))
 
-            dialog = tk.Toplevel(root)
+            dialog = ctk.CTkToplevel(root)
             dialog.title("Save Profile")
-            dialog.geometry("350x150")
+            dialog.geometry("380x180")
             dialog.transient(root)
             dialog.grab_set()
+            dialog.configure(fg_color=COLORS["bg_main"])
 
-            tk.Label(dialog, text="Profile Name:").grid(row=0, column=0, sticky=tk.W, padx=10, pady=10)
-            name_entry = tk.Entry(dialog, width=30)
-            name_entry.grid(row=0, column=1, padx=10, pady=10)
+            ctk.CTkLabel(dialog, text="Profile Name:", text_color=COLORS["text_dim"]).grid(row=0, column=0, sticky=tk.W, padx=16, pady=(16, 8))
+            name_entry = ctk.CTkEntry(dialog, width=220, fg_color=COLORS["bg_input"],
+                                       border_color=COLORS["border"], text_color=COLORS["text"])
+            name_entry.grid(row=0, column=1, padx=16, pady=(16, 8))
             name_entry.insert(0, "my-controller")
 
-            tk.Label(dialog, text="Description:").grid(row=1, column=0, sticky=tk.W, padx=10, pady=5)
-            desc_entry = tk.Entry(dialog, width=30)
-            desc_entry.grid(row=1, column=1, padx=10, pady=5)
+            ctk.CTkLabel(dialog, text="Description:", text_color=COLORS["text_dim"]).grid(row=1, column=0, sticky=tk.W, padx=16, pady=8)
+            desc_entry = ctk.CTkEntry(dialog, width=220, fg_color=COLORS["bg_input"],
+                                       border_color=COLORS["border"], text_color=COLORS["text"])
+            desc_entry.grid(row=1, column=1, padx=16, pady=8)
             desc_entry.insert(0, "Custom controller profile")
 
             def do_save():
@@ -1952,7 +1941,8 @@ class OpenProtocolEmulator:
                     profile_data = {
                         "name": profile_name,
                         "description": description,
-                        "revisions": dict(self.revision_config)
+                        "revisions": dict(self.revision_config),
+                        "relay_mappings": dict(self.relay_mappings)
                     }
                     with open(filepath, 'w') as f:
                         json.dump(profile_data, f, indent=2)
@@ -1965,10 +1955,14 @@ class OpenProtocolEmulator:
                 except Exception as e:
                     messagebox.showerror("Error", f"Failed to save profile: {e}")
 
-            btn_frame = tk.Frame(dialog)
-            btn_frame.grid(row=2, column=0, columnspan=2, pady=15)
-            tk.Button(btn_frame, text="Save", command=do_save, width=10).pack(side=tk.LEFT, padx=5)
-            tk.Button(btn_frame, text="Cancel", command=dialog.destroy, width=10).pack(side=tk.LEFT, padx=5)
+            btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+            btn_frame.grid(row=2, column=0, columnspan=2, pady=20)
+            ctk.CTkButton(btn_frame, text="Save", command=do_save, width=100,
+                          fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
+                          text_color=COLORS["bg_dark"], corner_radius=8, height=32).pack(side=tk.LEFT, padx=8)
+            ctk.CTkButton(btn_frame, text="Cancel", command=dialog.destroy, width=100,
+                          fg_color=COLORS["bg_card"], hover_color=COLORS["accent_dim"],
+                          border_width=1, border_color=COLORS["border"], corner_radius=8, height=32).pack(side=tk.LEFT, padx=8)
 
             name_entry.focus_set()
 
@@ -1997,112 +1991,169 @@ class OpenProtocolEmulator:
                 except Exception as e:
                     messagebox.showerror("Error", f"Failed to load profile: {e}")
 
-        main_container = ttk.Frame(root)
-        main_container.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+        main_container = ctk.CTkFrame(root, fg_color="transparent")
+        main_container.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
 
-        top_section = ttk.Frame(main_container)
+        top_section = ctk.CTkFrame(main_container, fg_color="transparent")
         top_section.pack(fill=tk.BOTH, expand=True)
 
-        notebook = ttk.Notebook(top_section)
-        notebook.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
+        notebook = ctk.CTkTabview(top_section, fg_color=COLORS["bg_card"],
+                                   segmented_button_fg_color=COLORS["bg_dark"],
+                                   segmented_button_selected_color=COLORS["accent"],
+                                   segmented_button_selected_hover_color=COLORS["accent_hover"],
+                                   segmented_button_unselected_color=COLORS["bg_dark"],
+                                   segmented_button_unselected_hover_color=COLORS["bg_main"],
+                                   text_color=COLORS["text"],
+                                   corner_radius=12)
+        notebook.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 12))
 
-        global_tab = ttk.Frame(notebook, padding=12)
-        notebook.add(global_tab, text="  GLOBAL  ")
+        notebook.add("GLOBAL")
+        notebook.add("PSET CONFIG")
+        notebook.add("REVISIONS")
 
-        ttk.Label(global_tab, text="SIMULATION PARAMETERS", font=("Consolas", 11, "bold")).grid(
-            row=0, column=0, columnspan=4, sticky=tk.W, pady=(0, 12))
+        global_tab = notebook.tab("GLOBAL")
 
-        ttk.Label(global_tab, text="Initial VIN:").grid(row=1, column=0, sticky=tk.W, pady=6)
-        ttk.Entry(global_tab, textvariable=vin_var, width=24).grid(row=1, column=1, columnspan=2, sticky=tk.W, padx=(8, 0))
+        ctk.CTkLabel(global_tab, text="SIMULATION PARAMETERS", font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                     text_color=COLORS["accent"]).grid(row=0, column=0, columnspan=3, sticky=tk.W, pady=(0, 16))
 
-        ttk.Label(global_tab, text="Global Batch Size:").grid(row=2, column=0, sticky=tk.W, pady=6)
-        ttk.Entry(global_tab, textvariable=batch_size_var, width=8).grid(row=2, column=1, sticky=tk.W, padx=(8, 0))
+        ctk.CTkLabel(global_tab, text="Initial VIN", text_color=COLORS["text_dim"]).grid(row=1, column=0, sticky=tk.W, pady=8)
+        ctk.CTkEntry(global_tab, textvariable=vin_var, width=200, fg_color=COLORS["bg_input"],
+                     border_color=COLORS["border"], text_color=COLORS["text"]).grid(row=1, column=1, sticky=tk.W, padx=(12, 0))
 
-        ttk.Label(global_tab, text="NOK Probability %:").grid(row=3, column=0, sticky=tk.W, pady=6)
-        ttk.Entry(global_tab, textvariable=nok_prob_var, width=8).grid(row=3, column=1, sticky=tk.W, padx=(8, 0))
+        ctk.CTkLabel(global_tab, text="Global Batch Size", text_color=COLORS["text_dim"]).grid(row=2, column=0, sticky=tk.W, pady=8)
+        ctk.CTkEntry(global_tab, textvariable=batch_size_var, width=80, fg_color=COLORS["bg_input"],
+                     border_color=COLORS["border"], text_color=COLORS["text"]).grid(row=2, column=1, sticky=tk.W, padx=(12, 0))
 
-        ttk.Label(global_tab, text="Auto Loop Interval (s):").grid(row=4, column=0, sticky=tk.W, pady=6)
-        ttk.Entry(global_tab, textvariable=auto_loop_interval_var, width=8).grid(row=4, column=1, sticky=tk.W, padx=(8, 0))
+        ctk.CTkLabel(global_tab, text="NOK Probability %", text_color=COLORS["text_dim"]).grid(row=3, column=0, sticky=tk.W, pady=8)
+        ctk.CTkEntry(global_tab, textvariable=nok_prob_var, width=80, fg_color=COLORS["bg_input"],
+                     border_color=COLORS["border"], text_color=COLORS["text"]).grid(row=3, column=1, sticky=tk.W, padx=(12, 0))
 
-        ttk.Button(global_tab, text="Apply Settings", command=apply_global_settings, style="Primary.TButton").grid(
-            row=5, column=0, columnspan=2, pady=(16, 8), sticky=tk.W)
+        ctk.CTkLabel(global_tab, text="Auto Loop Interval (s)", text_color=COLORS["text_dim"]).grid(row=4, column=0, sticky=tk.W, pady=8)
+        ctk.CTkEntry(global_tab, textvariable=auto_loop_interval_var, width=80, fg_color=COLORS["bg_input"],
+                     border_color=COLORS["border"], text_color=COLORS["text"]).grid(row=4, column=1, sticky=tk.W, padx=(12, 0))
 
-        ttk.Separator(global_tab, orient=tk.HORIZONTAL).grid(row=6, column=0, columnspan=4, sticky=tk.EW, pady=16)
+        ctk.CTkButton(global_tab, text="Apply Settings", command=apply_global_settings,
+                      fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
+                      text_color=COLORS["bg_dark"], font=ctk.CTkFont(weight="bold"),
+                      corner_radius=8, height=36).grid(row=5, column=0, columnspan=2, pady=(20, 12), sticky=tk.W)
 
-        ttk.Label(global_tab, text="CONTROLS", font=("Consolas", 11, "bold")).grid(
-            row=7, column=0, columnspan=4, sticky=tk.W, pady=(0, 12))
+        ctk.CTkLabel(global_tab, text="CONTROLS", font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                     text_color=COLORS["accent"]).grid(row=6, column=0, columnspan=3, sticky=tk.W, pady=(20, 12))
 
-        control_frame = ttk.Frame(global_tab)
-        control_frame.grid(row=8, column=0, columnspan=4, sticky=tk.W)
+        control_frame = ctk.CTkFrame(global_tab, fg_color="transparent")
+        control_frame.grid(row=7, column=0, columnspan=3, sticky=tk.W)
 
-        ttk.Button(control_frame, text="Toggle Auto Loop", command=toggle_auto_send_loop, style="Control.TButton").pack(
-            side=tk.LEFT, padx=(0, 8))
-        auto_status_label = ttk.Label(control_frame, textvariable=auto_send_loop_status_var, style="StatusValue.TLabel", width=10, anchor="center")
-        auto_status_label.pack(side=tk.LEFT, padx=(0, 16))
-        ttk.Button(control_frame, text="Send Single Result", command=manual_send_result, style="Control.TButton").pack(
-            side=tk.LEFT)
+        ctk.CTkButton(control_frame, text="Toggle Auto Loop", command=toggle_auto_send_loop,
+                      fg_color=COLORS["bg_main"], hover_color=COLORS["accent_dim"],
+                      border_width=1, border_color=COLORS["border"],
+                      corner_radius=8, height=32).pack(side=tk.LEFT, padx=(0, 12))
 
-        pset_tab = ttk.Frame(notebook, padding=12)
-        notebook.add(pset_tab, text="  PSET CONFIG  ")
+        auto_status_label = ctk.CTkLabel(control_frame, textvariable=auto_send_loop_status_var,
+                                          fg_color=COLORS["accent_dim"], text_color=COLORS["accent"],
+                                          corner_radius=6, width=80, font=ctk.CTkFont(weight="bold"))
+        auto_status_label.pack(side=tk.LEFT, padx=(0, 20))
 
-        ttk.Label(pset_tab, text="PARAMETER SET CONFIGURATION", font=("Consolas", 11, "bold")).grid(
-            row=0, column=0, columnspan=6, sticky=tk.W, pady=(0, 12))
+        ctk.CTkButton(control_frame, text="Send Single Result", command=manual_send_result,
+                      fg_color=COLORS["bg_main"], hover_color=COLORS["accent_dim"],
+                      border_width=1, border_color=COLORS["border"],
+                      corner_radius=8, height=32).pack(side=tk.LEFT)
 
-        ttk.Label(pset_tab, text="Pset ID:").grid(row=1, column=0, sticky=tk.W, pady=6)
-        pset_combo = ttk.Combobox(pset_tab, textvariable=pset_id_var, values=sorted(list(self.available_psets)), width=10, state="readonly")
-        pset_combo.grid(row=1, column=1, sticky=tk.W, padx=(8, 0))
-        ttk.Button(pset_tab, text="Load", command=load_pset_settings, style="Control.TButton").grid(
-            row=1, column=2, padx=(16, 0))
+        ctk.CTkLabel(global_tab, text="I/O RELAYS", font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                     text_color=COLORS["accent"]).grid(row=8, column=0, columnspan=3, sticky=tk.W, pady=(20, 12))
 
-        ttk.Separator(pset_tab, orient=tk.HORIZONTAL).grid(row=2, column=0, columnspan=6, sticky=tk.EW, pady=16)
+        relay_frame = ctk.CTkFrame(global_tab, fg_color="transparent")
+        relay_frame.grid(row=9, column=0, columnspan=3, sticky=tk.W)
 
-        ttk.Label(pset_tab, text="Batch Size:").grid(row=3, column=0, sticky=tk.W, pady=6)
-        ttk.Entry(pset_tab, textvariable=pset_batch_size_var, width=8).grid(row=3, column=1, sticky=tk.W, padx=(8, 0))
+        ctk.CTkLabel(relay_frame, text="Direction (Fwd/Rev)", text_color=COLORS["text_dim"]).pack(side=tk.LEFT, padx=(0, 8))
+        ctk.CTkSwitch(relay_frame, text="", variable=relay_direction_var, command=on_direction_toggle,
+                      onvalue=True, offvalue=False,
+                      fg_color=COLORS["border"], progress_color=COLORS["accent"],
+                      button_color=COLORS["text"], button_hover_color=COLORS["accent_hover"]).pack(side=tk.LEFT, padx=(0, 30))
 
-        ttk.Label(pset_tab, text="TORQUE LIMITS", font=("Consolas", 10, "bold")).grid(
-            row=4, column=0, columnspan=6, sticky=tk.W, pady=(16, 8))
+        ctk.CTkLabel(relay_frame, text="Trigger", text_color=COLORS["text_dim"]).pack(side=tk.LEFT, padx=(0, 8))
+        ctk.CTkSwitch(relay_frame, text="", variable=relay_trigger_var, command=on_trigger_toggle,
+                      onvalue=True, offvalue=False,
+                      fg_color=COLORS["border"], progress_color=COLORS["accent"],
+                      button_color=COLORS["text"], button_hover_color=COLORS["accent_hover"]).pack(side=tk.LEFT)
 
-        torque_frame = ttk.Frame(pset_tab)
-        torque_frame.grid(row=5, column=0, columnspan=6, sticky=tk.W)
-        ttk.Label(torque_frame, text="Target:").pack(side=tk.LEFT)
-        ttk.Entry(torque_frame, textvariable=pset_target_torque_var, width=8).pack(side=tk.LEFT, padx=(4, 16))
-        ttk.Label(torque_frame, text="Min:").pack(side=tk.LEFT)
-        ttk.Entry(torque_frame, textvariable=pset_torque_min_var, width=8).pack(side=tk.LEFT, padx=(4, 16))
-        ttk.Label(torque_frame, text="Max:").pack(side=tk.LEFT)
-        ttk.Entry(torque_frame, textvariable=pset_torque_max_var, width=8).pack(side=tk.LEFT, padx=(4, 0))
+        pset_tab = notebook.tab("PSET CONFIG")
 
-        ttk.Label(pset_tab, text="ANGLE LIMITS", font=("Consolas", 10, "bold")).grid(
-            row=6, column=0, columnspan=6, sticky=tk.W, pady=(16, 8))
+        ctk.CTkLabel(pset_tab, text="PARAMETER SET CONFIGURATION", font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                     text_color=COLORS["accent"]).grid(row=0, column=0, columnspan=4, sticky=tk.W, pady=(0, 16))
 
-        angle_frame = ttk.Frame(pset_tab)
-        angle_frame.grid(row=7, column=0, columnspan=6, sticky=tk.W)
-        ttk.Label(angle_frame, text="Target:").pack(side=tk.LEFT)
-        ttk.Entry(angle_frame, textvariable=pset_target_angle_var, width=8).pack(side=tk.LEFT, padx=(4, 16))
-        ttk.Label(angle_frame, text="Min:").pack(side=tk.LEFT)
-        ttk.Entry(angle_frame, textvariable=pset_angle_min_var, width=8).pack(side=tk.LEFT, padx=(4, 16))
-        ttk.Label(angle_frame, text="Max:").pack(side=tk.LEFT)
-        ttk.Entry(angle_frame, textvariable=pset_angle_max_var, width=8).pack(side=tk.LEFT, padx=(4, 0))
+        ctk.CTkLabel(pset_tab, text="Pset ID", text_color=COLORS["text_dim"]).grid(row=1, column=0, sticky=tk.W, pady=8)
+        pset_combo = ctk.CTkComboBox(pset_tab, variable=pset_id_var, values=sorted(list(self.available_psets)),
+                                      width=120, fg_color=COLORS["bg_input"], border_color=COLORS["border"],
+                                      button_color=COLORS["accent"], button_hover_color=COLORS["accent_hover"],
+                                      dropdown_fg_color=COLORS["bg_card"], dropdown_hover_color=COLORS["accent_dim"])
+        pset_combo.grid(row=1, column=1, sticky=tk.W, padx=(12, 0))
+        ctk.CTkButton(pset_tab, text="Load", command=load_pset_settings, width=70,
+                      fg_color=COLORS["bg_main"], hover_color=COLORS["accent_dim"],
+                      border_width=1, border_color=COLORS["border"],
+                      corner_radius=8, height=32).grid(row=1, column=2, padx=(16, 0))
 
-        ttk.Button(pset_tab, text="Apply Pset Settings", command=apply_pset_settings, style="Primary.TButton").grid(
-            row=8, column=0, columnspan=3, pady=(20, 8), sticky=tk.W)
+        ctk.CTkLabel(pset_tab, text="Batch Size", text_color=COLORS["text_dim"]).grid(row=2, column=0, sticky=tk.W, pady=8)
+        ctk.CTkEntry(pset_tab, textvariable=pset_batch_size_var, width=80, fg_color=COLORS["bg_input"],
+                     border_color=COLORS["border"], text_color=COLORS["text"]).grid(row=2, column=1, sticky=tk.W, padx=(12, 0))
 
-        revision_tab = ttk.Frame(notebook, padding=12)
-        notebook.add(revision_tab, text="  REVISIONS  ")
+        ctk.CTkLabel(pset_tab, text="TORQUE LIMITS", font=ctk.CTkFont(size=12, weight="bold"),
+                     text_color=COLORS["text"]).grid(row=3, column=0, columnspan=4, sticky=tk.W, pady=(20, 8))
 
-        ttk.Label(revision_tab, text="MID REVISION CONFIGURATION", font=("Consolas", 11, "bold")).grid(
-            row=0, column=0, columnspan=6, sticky=tk.W, pady=(0, 12))
+        torque_frame = ctk.CTkFrame(pset_tab, fg_color="transparent")
+        torque_frame.grid(row=4, column=0, columnspan=4, sticky=tk.W)
+        ctk.CTkLabel(torque_frame, text="Target:", text_color=COLORS["text_dim"]).pack(side=tk.LEFT)
+        ctk.CTkEntry(torque_frame, textvariable=pset_target_torque_var, width=80, fg_color=COLORS["bg_input"],
+                     border_color=COLORS["border"]).pack(side=tk.LEFT, padx=(8, 20))
+        ctk.CTkLabel(torque_frame, text="Min:", text_color=COLORS["text_dim"]).pack(side=tk.LEFT)
+        ctk.CTkEntry(torque_frame, textvariable=pset_torque_min_var, width=80, fg_color=COLORS["bg_input"],
+                     border_color=COLORS["border"]).pack(side=tk.LEFT, padx=(8, 20))
+        ctk.CTkLabel(torque_frame, text="Max:", text_color=COLORS["text_dim"]).pack(side=tk.LEFT)
+        ctk.CTkEntry(torque_frame, textvariable=pset_torque_max_var, width=80, fg_color=COLORS["bg_input"],
+                     border_color=COLORS["border"]).pack(side=tk.LEFT, padx=(8, 0))
 
-        profile_frame = ttk.Frame(revision_tab)
-        profile_frame.grid(row=1, column=0, columnspan=6, sticky=tk.W, pady=(0, 16))
-        ttk.Label(profile_frame, text="Profile:").pack(side=tk.LEFT)
-        profile_combo = ttk.Combobox(profile_frame, textvariable=profile_var, values=self.get_available_profiles(), width=16, state="readonly")
-        profile_combo.pack(side=tk.LEFT, padx=(8, 12))
+        ctk.CTkLabel(pset_tab, text="ANGLE LIMITS", font=ctk.CTkFont(size=12, weight="bold"),
+                     text_color=COLORS["text"]).grid(row=5, column=0, columnspan=4, sticky=tk.W, pady=(20, 8))
+
+        angle_frame = ctk.CTkFrame(pset_tab, fg_color="transparent")
+        angle_frame.grid(row=6, column=0, columnspan=4, sticky=tk.W)
+        ctk.CTkLabel(angle_frame, text="Target:", text_color=COLORS["text_dim"]).pack(side=tk.LEFT)
+        ctk.CTkEntry(angle_frame, textvariable=pset_target_angle_var, width=80, fg_color=COLORS["bg_input"],
+                     border_color=COLORS["border"]).pack(side=tk.LEFT, padx=(8, 20))
+        ctk.CTkLabel(angle_frame, text="Min:", text_color=COLORS["text_dim"]).pack(side=tk.LEFT)
+        ctk.CTkEntry(angle_frame, textvariable=pset_angle_min_var, width=80, fg_color=COLORS["bg_input"],
+                     border_color=COLORS["border"]).pack(side=tk.LEFT, padx=(8, 20))
+        ctk.CTkLabel(angle_frame, text="Max:", text_color=COLORS["text_dim"]).pack(side=tk.LEFT)
+        ctk.CTkEntry(angle_frame, textvariable=pset_angle_max_var, width=80, fg_color=COLORS["bg_input"],
+                     border_color=COLORS["border"]).pack(side=tk.LEFT, padx=(8, 0))
+
+        ctk.CTkButton(pset_tab, text="Apply Pset Settings", command=apply_pset_settings,
+                      fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
+                      text_color=COLORS["bg_dark"], font=ctk.CTkFont(weight="bold"),
+                      corner_radius=8, height=36).grid(row=7, column=0, columnspan=2, pady=(24, 8), sticky=tk.W)
+
+        revision_tab = notebook.tab("REVISIONS")
+
+        ctk.CTkLabel(revision_tab, text="MID REVISION CONFIGURATION", font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                     text_color=COLORS["accent"]).grid(row=0, column=0, columnspan=6, sticky=tk.W, pady=(0, 16))
+
+        profile_frame = ctk.CTkFrame(revision_tab, fg_color="transparent")
+        profile_frame.grid(row=1, column=0, columnspan=6, sticky=tk.W, pady=(0, 20))
+        ctk.CTkLabel(profile_frame, text="Profile:", text_color=COLORS["text_dim"]).pack(side=tk.LEFT)
+        profile_combo = ctk.CTkComboBox(profile_frame, variable=profile_var, values=self.get_available_profiles(),
+                                         width=160, fg_color=COLORS["bg_input"], border_color=COLORS["border"],
+                                         button_color=COLORS["accent"], button_hover_color=COLORS["accent_hover"],
+                                         dropdown_fg_color=COLORS["bg_card"], dropdown_hover_color=COLORS["accent_dim"])
+        profile_combo.pack(side=tk.LEFT, padx=(12, 16))
         profile_menu = profile_combo
-        ttk.Button(profile_frame, text="Apply", command=apply_profile_selection, style="Control.TButton").pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(profile_frame, text="Save...", command=save_profile_dialog, style="Control.TButton").pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(profile_frame, text="Load...", command=load_profile_from_file, style="Control.TButton").pack(side=tk.LEFT)
-
-        ttk.Separator(revision_tab, orient=tk.HORIZONTAL).grid(row=2, column=0, columnspan=6, sticky=tk.EW, pady=8)
+        ctk.CTkButton(profile_frame, text="Apply", command=apply_profile_selection, width=70,
+                      fg_color=COLORS["bg_main"], hover_color=COLORS["accent_dim"],
+                      border_width=1, border_color=COLORS["border"], corner_radius=8, height=32).pack(side=tk.LEFT, padx=(0, 8))
+        ctk.CTkButton(profile_frame, text="Save...", command=save_profile_dialog, width=70,
+                      fg_color=COLORS["bg_main"], hover_color=COLORS["accent_dim"],
+                      border_width=1, border_color=COLORS["border"], corner_radius=8, height=32).pack(side=tk.LEFT, padx=(0, 8))
+        ctk.CTkButton(profile_frame, text="Load...", command=load_profile_from_file, width=70,
+                      fg_color=COLORS["bg_main"], hover_color=COLORS["accent_dim"],
+                      border_width=1, border_color=COLORS["border"], corner_radius=8, height=32).pack(side=tk.LEFT)
 
         mid_configs = [
             ("MID 0002", "Comm Start", rev_mid_0002_var, 1, 6),
@@ -2116,101 +2167,141 @@ class OpenProtocolEmulator:
         ]
 
         for idx, (mid, desc, var, min_val, max_val) in enumerate(mid_configs):
-            row = 3 + (idx // 2)
+            row = 2 + (idx // 2)
             col = (idx % 2) * 3
-            ttk.Label(revision_tab, text=f"{mid} ({desc}):").grid(row=row, column=col, sticky=tk.W, pady=4, padx=(0, 4))
-            ttk.Spinbox(revision_tab, from_=min_val, to=max_val, textvariable=var, width=4).grid(
-                row=row, column=col+1, sticky=tk.W, padx=(0, 24))
+            ctk.CTkLabel(revision_tab, text=f"{mid} ({desc}):", text_color=COLORS["text_dim"]).grid(
+                row=row, column=col, sticky=tk.W, pady=6, padx=(0, 8))
+            ctk.CTkEntry(revision_tab, textvariable=var, width=50, fg_color=COLORS["bg_input"],
+                         border_color=COLORS["border"], text_color=COLORS["text"]).grid(
+                row=row, column=col+1, sticky=tk.W, padx=(0, 30))
 
-        ttk.Button(revision_tab, text="Apply Revisions", command=apply_revision_settings, style="Primary.TButton").grid(
-            row=8, column=0, columnspan=3, pady=(16, 8), sticky=tk.W)
+        ctk.CTkButton(revision_tab, text="Apply Revisions", command=apply_revision_settings,
+                      fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
+                      text_color=COLORS["bg_dark"], font=ctk.CTkFont(weight="bold"),
+                      corner_radius=8, height=36).grid(row=7, column=0, columnspan=2, pady=(20, 8), sticky=tk.W)
 
-        status_frame = ttk.LabelFrame(top_section, text="STATUS", padding=12)
-        status_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 0))
+        status_frame = ctk.CTkFrame(top_section, fg_color=COLORS["bg_card"], corner_radius=12)
+        status_frame.pack(side=tk.RIGHT, fill=tk.Y)
+
+        ctk.CTkLabel(status_frame, text="STATUS", font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                     text_color=COLORS["accent"]).pack(pady=(16, 12), padx=16, anchor=tk.W)
 
         status_items = [
-            ("Connection:", conn_display_var, "conn"),
-            ("Tool:", tool_protocol_status_var, "tool"),
-            ("Pset:", pset_display_var, "pset"),
-            ("VIN:", vin_display_var, "vin"),
-            ("Batch:", batch_display_var, "batch"),
-            ("Auto Loop:", auto_send_loop_status_var, "loop"),
+            ("Connection", conn_display_var, "conn"),
+            ("Tool", tool_protocol_status_var, "tool"),
+            ("Pset", pset_display_var, "pset"),
+            ("VIN", vin_display_var, "vin"),
+            ("Batch", batch_display_var, "batch"),
+            ("Auto Loop", auto_send_loop_status_var, "loop"),
         ]
 
         conn_label = None
         tool_label = None
         result_status_label = None
 
-        for idx, (label_text, var, key) in enumerate(status_items):
-            ttk.Label(status_frame, text=label_text, style="Status.TLabel").grid(row=idx, column=0, sticky=tk.W, pady=4)
-            lbl = ttk.Label(status_frame, textvariable=var, style="StatusValue.TLabel", width=14, anchor="e")
-            lbl.grid(row=idx, column=1, sticky=tk.E, pady=4, padx=(8, 0))
+        for label_text, var, key in status_items:
+            row_frame = ctk.CTkFrame(status_frame, fg_color="transparent")
+            row_frame.pack(fill=tk.X, padx=16, pady=4)
+            ctk.CTkLabel(row_frame, text=label_text, text_color=COLORS["text_dim"], width=80, anchor=tk.W).pack(side=tk.LEFT)
+            lbl = ctk.CTkLabel(row_frame, textvariable=var, text_color=COLORS["accent"],
+                               font=ctk.CTkFont(weight="bold"), width=100, anchor=tk.E)
+            lbl.pack(side=tk.RIGHT)
             if key == "conn":
                 conn_label = lbl
             elif key == "tool":
                 tool_label = lbl
 
-        ttk.Separator(status_frame, orient=tk.HORIZONTAL).grid(row=6, column=0, columnspan=2, sticky=tk.EW, pady=12)
+        ctk.CTkLabel(status_frame, text="", height=1, fg_color=COLORS["border"]).pack(fill=tk.X, padx=16, pady=12)
 
-        ttk.Label(status_frame, text="LAST RESULT", font=("Consolas", 9, "bold"), foreground="#00d9ff").grid(
-            row=7, column=0, columnspan=2, sticky=tk.W, pady=(0, 8))
+        ctk.CTkLabel(status_frame, text="LAST RESULT", font=ctk.CTkFont(size=12, weight="bold"),
+                     text_color=COLORS["accent"]).pack(pady=(0, 8), padx=16, anchor=tk.W)
 
         result_items = [
-            ("Status:", last_result_status_var, "result_status"),
-            ("Torque:", last_result_torque_var, "torque"),
-            ("Angle:", last_result_angle_var, "angle"),
-            ("ID:", last_result_id_var, "id"),
+            ("Status", last_result_status_var, "result_status"),
+            ("Torque", last_result_torque_var, "torque"),
+            ("Angle", last_result_angle_var, "angle"),
+            ("ID", last_result_id_var, "id"),
         ]
 
-        for idx, (label_text, var, key) in enumerate(result_items):
-            ttk.Label(status_frame, text=label_text, style="Status.TLabel").grid(row=8+idx, column=0, sticky=tk.W, pady=2)
-            lbl = ttk.Label(status_frame, textvariable=var, style="StatusValue.TLabel", width=14, anchor="e")
-            lbl.grid(row=8+idx, column=1, sticky=tk.E, pady=2, padx=(8, 0))
+        for label_text, var, key in result_items:
+            row_frame = ctk.CTkFrame(status_frame, fg_color="transparent")
+            row_frame.pack(fill=tk.X, padx=16, pady=3)
+            ctk.CTkLabel(row_frame, text=label_text, text_color=COLORS["text_dim"], width=80, anchor=tk.W).pack(side=tk.LEFT)
+            lbl = ctk.CTkLabel(row_frame, textvariable=var, text_color=COLORS["text"],
+                               font=ctk.CTkFont(weight="bold"), width=100, anchor=tk.E)
+            lbl.pack(side=tk.RIGHT)
             if key == "result_status":
                 result_status_label = lbl
 
-        log_frame = ttk.LabelFrame(main_container, text="COMMUNICATION LOG", padding=8)
-        log_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        ctk.CTkLabel(status_frame, text="", height=1, fg_color=COLORS["border"]).pack(fill=tk.X, padx=16, pady=12)
 
-        log_controls = ttk.Frame(log_frame)
-        log_controls.pack(fill=tk.X, pady=(0, 8))
+        ctk.CTkLabel(status_frame, text="SUBSCRIPTIONS", font=ctk.CTkFont(size=12, weight="bold"),
+                     text_color=COLORS["accent"]).pack(pady=(0, 8), padx=16, anchor=tk.W)
 
-        ttk.Button(log_controls, text="Clear", command=clear_log, style="Control.TButton").pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(log_controls, text="Save Log...", command=save_log, style="Control.TButton").pack(side=tk.LEFT, padx=(0, 16))
-        ttk.Checkbutton(log_controls, text="Live Log to File", variable=log_to_file_var, command=toggle_file_logging).pack(side=tk.LEFT, padx=(0, 16))
-        ttk.Checkbutton(log_controls, text="Hide Keep-Alive (9999)", variable=hide_keepalive_var).pack(side=tk.LEFT)
+        sub_items = [
+            ("VIN", sub_vin_var, lambda: self.vin_subscribed),
+            ("Pset", sub_pset_var, lambda: self.pset_subscribed),
+            ("Result", sub_result_var, lambda: self.result_subscribed),
+            ("Multi-Spin", sub_multi_var, lambda: self.multi_spindle_subscribed),
+            ("Relays", sub_relay_var, lambda: len(self.relay_subscriptions) > 0),
+        ]
 
-        log_container = ttk.Frame(log_frame)
-        log_container.pack(fill=tk.BOTH, expand=True)
+        sub_labels = []
+        for label_text, var, subscribed_fn in sub_items:
+            row_frame = ctk.CTkFrame(status_frame, fg_color="transparent")
+            row_frame.pack(fill=tk.X, padx=16, pady=3)
+            ctk.CTkLabel(row_frame, text=label_text, text_color=COLORS["text_dim"], width=80, anchor=tk.W).pack(side=tk.LEFT)
+            lbl = ctk.CTkLabel(row_frame, textvariable=var, text_color=COLORS["text_dim"],
+                               font=ctk.CTkFont(weight="bold"), width=100, anchor=tk.E)
+            lbl.pack(side=tk.RIGHT)
+            sub_labels.append((lbl, subscribed_fn))
 
-        log_text = tk.Text(
+        ctk.CTkLabel(status_frame, text="").pack(pady=8)
+
+        log_frame = ctk.CTkFrame(main_container, fg_color=COLORS["bg_card"], corner_radius=12)
+        log_frame.pack(fill=tk.BOTH, expand=True, pady=(12, 0))
+
+        log_header = ctk.CTkFrame(log_frame, fg_color="transparent")
+        log_header.pack(fill=tk.X, padx=16, pady=(12, 8))
+
+        ctk.CTkLabel(log_header, text="COMMUNICATION LOG", font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+                     text_color=COLORS["accent"]).pack(side=tk.LEFT)
+
+        log_controls = ctk.CTkFrame(log_header, fg_color="transparent")
+        log_controls.pack(side=tk.RIGHT)
+
+        ctk.CTkButton(log_controls, text="Clear", command=clear_log, width=70,
+                      fg_color=COLORS["bg_main"], hover_color=COLORS["accent_dim"],
+                      border_width=1, border_color=COLORS["border"],
+                      corner_radius=8, height=28).pack(side=tk.LEFT, padx=(0, 8))
+        ctk.CTkButton(log_controls, text="Save Log...", command=save_log, width=90,
+                      fg_color=COLORS["bg_main"], hover_color=COLORS["accent_dim"],
+                      border_width=1, border_color=COLORS["border"],
+                      corner_radius=8, height=28).pack(side=tk.LEFT, padx=(0, 16))
+        ctk.CTkCheckBox(log_controls, text="Live Log to File", variable=log_to_file_var, command=toggle_file_logging,
+                        fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
+                        border_color=COLORS["border"], text_color=COLORS["text_dim"]).pack(side=tk.LEFT, padx=(0, 16))
+        ctk.CTkCheckBox(log_controls, text="Hide Keep-Alive", variable=hide_keepalive_var,
+                        fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
+                        border_color=COLORS["border"], text_color=COLORS["text_dim"]).pack(side=tk.LEFT)
+
+        log_container = ctk.CTkFrame(log_frame, fg_color=COLORS["bg_input"], corner_radius=8)
+        log_container.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 16))
+
+        log_text = ctk.CTkTextbox(
             log_container,
-            height=10,
-            wrap=tk.NONE,
-            font=("Consolas", 9),
-            bg="#0d1117",
-            fg="#8b949e",
-            insertbackground="#00d9ff",
-            selectbackground="#1a4a7a",
-            selectforeground="#e8e8e8",
-            relief="flat",
-            borderwidth=0,
-            padx=8,
-            pady=8
+            font=ctk.CTkFont(family="Consolas", size=11),
+            fg_color=COLORS["bg_input"],
+            text_color=COLORS["text_dim"],
+            corner_radius=8,
+            wrap="none",
+            activate_scrollbars=True
         )
-        log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        log_text.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
-        log_scrollbar_y = ttk.Scrollbar(log_container, orient=tk.VERTICAL, command=log_text.yview)
-        log_scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
-        log_text.configure(yscrollcommand=log_scrollbar_y.set)
-
-        log_scrollbar_x = ttk.Scrollbar(log_frame, orient=tk.HORIZONTAL, command=log_text.xview)
-        log_scrollbar_x.pack(fill=tk.X)
-        log_text.configure(xscrollcommand=log_scrollbar_x.set)
-
-        log_text.tag_configure("send", foreground="#00d9ff")
-        log_text.tag_configure("recv", foreground="#00ff88")
-        log_text.tag_configure("info", foreground="#ffaa00")
+        log_text.tag_config("send", foreground=COLORS["accent"])
+        log_text.tag_config("recv", foreground=COLORS["success"])
+        log_text.tag_config("info", foreground=COLORS["warning"])
         log_text.configure(state='disabled')
 
         def on_closing():
