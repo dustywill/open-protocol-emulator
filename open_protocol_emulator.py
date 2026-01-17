@@ -5,7 +5,7 @@ import time
 import datetime
 import random
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 import re # Import regex for VIN parsing
 import argparse # For command-line arguments
 
@@ -1369,6 +1369,10 @@ class OpenProtocolEmulator:
         rev_mid_0052_var = tk.StringVar(value=str(self.revision_config.get(52, 2)))
         rev_mid_0061_var = tk.StringVar(value=str(self.revision_config.get(61, 7)))
         # --- End Revision Configuration GUI Variables ---
+
+        # --- Profile GUI Variables ---
+        profile_var = tk.StringVar(value=self.get_current_profile())
+        # --- End Profile GUI Variables ---
 
         # --- Pset GUI Variables ---
         pset_id_var = tk.StringVar(value=list(self.available_psets)[0] if self.available_psets else "")
