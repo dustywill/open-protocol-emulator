@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 ## Current Position
 
 Phase: 4 of 7 (Multi-Revision Implementation)
-Plan: 2 of 5 in current phase
+Plan: 3 of 5 in current phase
 Status: In progress
-Last activity: 2026-01-16 — Completed 04-02-PLAN.md
+Last activity: 2026-01-16 — Completed 04-03-PLAN.md
 
-Progress: ██████░░░░ 58%
+Progress: ██████▓░░░ 63%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
+- Total plans completed: 12
 - Average duration: ~9 min
-- Total execution time: ~97 min
+- Total execution time: ~105 min
 
 **By Phase:**
 
@@ -31,10 +31,10 @@ Progress: ██████░░░░ 58%
 | 02 | 3 | ~35min | ~12min |
 | 03 | 3 | ~21min | ~7min |
 | 03.5 | 1 | ~12min | ~12min |
-| 04 | 2 | ~14min | ~7min |
+| 04 | 3 | ~22min | ~7min |
 
 **Recent Trend:**
-- Last 5 plans: 03-02, 03-03, 03.5-01, 04-01, 04-02
+- Last 5 plans: 03-03, 03.5-01, 04-01, 04-02, 04-03
 - Trend: Stable (multi-revision plans efficient)
 
 ## Accumulated Context
@@ -65,6 +65,8 @@ Recent decisions affecting current work:
 | 04-01 | MID 0004 uses rev 1 by default | No client capability tracking yet |
 | 04-02 | Revision 1 compact format, Revision 2 field-prefixed | Different data structures for different revisions |
 | 04-02 | OK counter tracks successful tightenings since Pset | Resets on Pset change for accurate tracking |
+| 04-03 | MID 0040 is Tool Data Request, MID 0041 is Tool Data Reply | Distinct from MID 0042/0043 enable/disable |
+| 04-03 | Tool tightening counters increment on every tightening | Track all tightenings regardless of OK/NOK |
 
 ### Deferred Issues
 
@@ -77,6 +79,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Completed 04-02-PLAN.md
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None
-Next: 04-03-PLAN.md (Multi-revision support for VIN MIDs)
+Next: 04-04-PLAN.md (Multi-revision support for VIN MIDs)
