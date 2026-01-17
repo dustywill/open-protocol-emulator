@@ -565,6 +565,21 @@ class OpenProtocolEmulator:
 
         return "".join(fields)
 
+    def _build_mid0052_data(self, revision: int) -> str:
+        """Build MID 0052 VIN data for given revision (1-2)."""
+        if revision == 1:
+            return self.current_vin.ljust(25)[:25]
+
+        elif revision >= 2:
+            fields = []
+            fields.append(f"01{self.current_vin.ljust(25)[:25]}")
+            fields.append(f"02{self.identifier_part2.ljust(25)[:25]}")
+            fields.append(f"03{self.identifier_part3.ljust(25)[:25]}")
+            fields.append(f"04{self.identifier_part4.ljust(25)[:25]}")
+            return "".join(fields)
+
+        return self.current_vin.ljust(25)[:25]
+
     def _parse_vin(self, vin_string):
         """Parses VIN into prefix and numeric parts."""
         match = re.match(r'^(.*?)(\d+)$', vin_string)
