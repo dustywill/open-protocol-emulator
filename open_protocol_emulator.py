@@ -301,6 +301,38 @@ class OpenProtocolEmulator:
             return "Unknown profile"
         return self.DEFAULT_PROFILES[profile_name]["description"]
 
+    def save_profile_to_file(self, filepath: str, profile_name: str) -> None:
+        """Save current revision config as a named profile to JSON file."""
+        import json
+        profile_data = {
+            "name": profile_name,
+            "description": f"Custom profile: {profile_name}",
+            "revisions": dict(self.revision_config)
+        }
+        with open(filepath, 'w') as f:
+            json.dump(profile_data, f, indent=2)
+
+    def load_profile_from_file(self, filepath: str) -> str:
+        """Load a profile from JSON file and apply it. Returns profile name."""
+        import json
+        import os
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"Profile file not found: {filepath}")
+
+        with open(filepath, 'r') as f:
+            profile_data = json.load(f)
+
+        if "revisions" not in profile_data:
+            raise ValueError("Invalid profile file: missing 'revisions' key")
+
+        for mid_str, rev in profile_data["revisions"].items():
+            mid = int(mid_str)
+            self.revision_config[mid] = rev
+
+        profile_name = profile_data.get("name", "custom")
+        self.current_profile = profile_name
+        return profile_name
+
     def _build_mid0002_data(self, revision: int) -> str:
         """Build MID 0002 response data for given revision (1-6)."""
         fields = []
