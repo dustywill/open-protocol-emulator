@@ -1368,6 +1368,8 @@ class OpenProtocolEmulator:
         rev_mid_0041_var = tk.StringVar(value=str(self.revision_config.get(41, 5)))
         rev_mid_0052_var = tk.StringVar(value=str(self.revision_config.get(52, 2)))
         rev_mid_0061_var = tk.StringVar(value=str(self.revision_config.get(61, 7)))
+        rev_mid_0101_var = tk.StringVar(value=str(self.revision_config.get(101, 5)))
+        rev_mid_0215_var = tk.StringVar(value=str(self.revision_config.get(215, 2)))
         # --- End Revision Configuration GUI Variables ---
 
         # --- Profile GUI Variables ---
@@ -1513,6 +1515,8 @@ class OpenProtocolEmulator:
                 self.set_max_revision(41, int(rev_mid_0041_var.get()))
                 self.set_max_revision(52, int(rev_mid_0052_var.get()))
                 self.set_max_revision(61, int(rev_mid_0061_var.get()))
+                self.set_max_revision(101, int(rev_mid_0101_var.get()))
+                self.set_max_revision(215, int(rev_mid_0215_var.get()))
                 self.current_profile = "custom"
                 print("[GUI] Applied revision configuration:")
                 for mid, rev in sorted(self.revision_config.items()):
@@ -1530,6 +1534,8 @@ class OpenProtocolEmulator:
                 rev_mid_0041_var.set(str(self.revision_config.get(41, 5)))
                 rev_mid_0052_var.set(str(self.revision_config.get(52, 2)))
                 rev_mid_0061_var.set(str(self.revision_config.get(61, 7)))
+                rev_mid_0101_var.set(str(self.revision_config.get(101, 5)))
+                rev_mid_0215_var.set(str(self.revision_config.get(215, 2)))
                 print(f"[GUI] Applied profile: {selected_profile}")
                 print(f"  Description: {self.get_profile_description(selected_profile)}")
             except ValueError as e:
@@ -1567,6 +1573,8 @@ class OpenProtocolEmulator:
                     rev_mid_0041_var.set(str(self.revision_config.get(41, 5)))
                     rev_mid_0052_var.set(str(self.revision_config.get(52, 2)))
                     rev_mid_0061_var.set(str(self.revision_config.get(61, 7)))
+                    rev_mid_0101_var.set(str(self.revision_config.get(101, 5)))
+                    rev_mid_0215_var.set(str(self.revision_config.get(215, 2)))
                     print(f"[GUI] Loaded profile '{loaded_name}' from: {filepath}")
                     messagebox.showinfo("Success", f"Profile '{loaded_name}' loaded")
                 except FileNotFoundError:
@@ -1653,8 +1661,14 @@ class OpenProtocolEmulator:
         tk.Label(revision_frame, text="MID 0061 (Result):").grid(row=3, column=2, sticky=tk.W, padx=2, pady=2)
         tk.Spinbox(revision_frame, from_=1, to=7, textvariable=rev_mid_0061_var, width=3).grid(row=3, column=3, sticky=tk.W, padx=2, pady=2)
 
-        # Apply revisions button (spans rows 1-3)
-        tk.Button(revision_frame, text="Apply Revisions", command=apply_revision_settings).grid(row=1, column=4, rowspan=3, padx=10, pady=2, sticky=tk.NS)
+        # Row 4: MID 0101 and MID 0215
+        tk.Label(revision_frame, text="MID 0101 (Multi-Spindle):").grid(row=4, column=0, sticky=tk.W, padx=2, pady=2)
+        tk.Spinbox(revision_frame, from_=1, to=5, textvariable=rev_mid_0101_var, width=3).grid(row=4, column=1, sticky=tk.W, padx=2, pady=2)
+        tk.Label(revision_frame, text="MID 0215 (I/O Status):").grid(row=4, column=2, sticky=tk.W, padx=2, pady=2)
+        tk.Spinbox(revision_frame, from_=1, to=2, textvariable=rev_mid_0215_var, width=3).grid(row=4, column=3, sticky=tk.W, padx=2, pady=2)
+
+        # Apply revisions button (spans rows 1-4)
+        tk.Button(revision_frame, text="Apply Revisions", command=apply_revision_settings).grid(row=1, column=4, rowspan=4, padx=10, pady=2, sticky=tk.NS)
         # --- End Revision Configuration Frame ---
 
         control_frame = tk.LabelFrame(root, text="Controls", padx=5, pady=5)
