@@ -66,9 +66,14 @@ class OpenProtocolEmulator:
         self.target_batch_size = 5
         self.batch_counter = 0
         self.nok_probability = 0.3
+        # VIN 4-part identifier (for MID 0052 revision 2)
+        self.identifier_part2 = ""
+        self.identifier_part3 = ""
+        self.identifier_part4 = ""
         # --- End VIN and Batch State ---
         self.vin_subscribed = False
         self.vin_no_ack = False
+        self.vin_subscribed_rev = 1
         self.result_subscribed = False
         self.result_no_ack = False
         self.auto_loop_interval = 20
@@ -680,6 +685,7 @@ class OpenProtocolEmulator:
         self.session_active = False
         self.vin_subscribed = False; self.result_subscribed = False; self.pset_subscribed = False
         self.pset_subscribed_rev = 1
+        self.vin_subscribed_rev = 1
         try: sock.close()
         except OSError: pass
         self.client_socket = None
