@@ -436,17 +436,16 @@ class OpenProtocolEmulator:
 
     def _handle_mid_0060(self, mid_int, rev, no_ack_flag, data_field, msg):
         req_rev = int(rev) if rev.strip() else 1
-        if req_rev > 1:
-            error_data = self._build_mid0004_data(1, 60, 97)
-            resp = build_message(4, rev=1, data=error_data)
-        elif self.result_subscribed:
+        if self.result_subscribed:
             error_data = self._build_mid0004_data(1, 60, 9)
             resp = build_message(4, rev=1, data=error_data)
         else:
+            subscribed_rev = self._get_response_revision(61, req_rev)
+            self.result_subscribed_rev = subscribed_rev
             self.result_subscribed = True
             self.result_no_ack = (no_ack_flag == "1")
             resp = build_message(5, rev=1, data="0060")
-            print("[Tightening] Result subscription accepted.")
+            print(f"[Tightening] Subscribed at revision {subscribed_rev}.")
         self.send_to_client(resp)
 
     def _handle_mid_0062(self, mid_int, rev, no_ack_flag, data_field, msg):
@@ -780,10 +779,8 @@ class OpenProtocolEmulator:
 
 
     def send_single_tightening_result(self):
-        """Generate and send a single simulated MID 0061 tightening result (Rev 1)."""
-        # Check protocol state first
+        """Generate and send a single simulated MID 0061 tightening result."""
         if not self.tool_enabled:
-            # Added explicit log here
             print("[Tightening] Send prevented: Tool is disabled (MID 0042/0040).")
             return
         if not self.session_active or not self.result_subscribed:
@@ -791,14 +788,12 @@ class OpenProtocolEmulator:
             return
 
         self.tightening_id_counter = (self.tightening_id_counter + 1) % 10000000000
-        tightening_id_str = f"{self.tightening_id_counter:010d}"
 
         tighten_time = datetime.datetime.now()
         timestamp_str = tighten_time.strftime("%Y-%m-%d:%H:%M:%S")
         pset_change_ts = (self.pset_last_change.strftime("%Y-%m-%d:%H:%M:%S")
                           if self.pset_last_change else timestamp_str)
 
-        # --- Get Pset Parameters ---
         current_pset_params = self.pset_parameters.get(self.current_pset)
 
         if current_pset_params:
@@ -811,33 +806,29 @@ class OpenProtocolEmulator:
             current_target_batch_size = current_pset_params["batch_size"]
             print(f"[Tightening] Using parameters from Pset {self.current_pset}")
         else:
-            # Fallback to global defaults if no Pset selected or params not found
             target_torque = 50.00
             torque_min = 47.00
             torque_max = 53.00
             target_angle = 90
             angle_min = 80
             angle_max = 100
-            current_target_batch_size = self.target_batch_size # Use global batch size as fallback
+            current_target_batch_size = self.target_batch_size
             print("[Tightening] Using global default parameters.")
-        # --- End Get Pset Parameters ---
-
 
         is_nok = random.random() < self.nok_probability
         status = "0" if is_nok else "1"
-        torque_status = "1"; angle_status = "1"
+        torque_status = "1"
+        angle_status = "1"
         actual_torque = random.uniform(torque_min, torque_max)
         actual_angle = random.uniform(angle_min, angle_max)
 
-        # Adjust actual values if NOK to simulate failure outside limits
         if is_nok:
             if random.choice(["torque", "angle"]) == "torque":
-                torque_status = random.choice(["0", "2"]) # 0: Low, 2: High
+                torque_status = random.choice(["0", "2"])
                 actual_torque = random.uniform(torque_min - 5, torque_min - 0.1) if torque_status == "0" else random.uniform(torque_max + 0.1, torque_max + 5)
             else:
-                angle_status = random.choice(["0", "2"]) # 0: Low, 2: High
+                angle_status = random.choice(["0", "2"])
                 actual_angle = random.uniform(angle_min - 20, angle_min - 1) if angle_status == "0" else random.uniform(angle_max + 1, angle_max + 20)
-
 
         with self.state_lock:
             self.tool_number_of_tightenings += 1
@@ -860,26 +851,36 @@ class OpenProtocolEmulator:
                 batch_status = "1"
                 batch_completed = True
 
-        params = {
-            "01": f"{1:04d}", "02": f"{1:02d}", "03": self.controller_name,
-            "04": self.current_vin.ljust(25)[:25], "05": f"{0:02d}",
-            "06": (self.current_pset if self.current_pset else "0").rjust(3, '0'),
-            "07": f"{current_target_batch_size:04d}",
-            "08": f"{batch_counter_val:04d}",
-            "09": status, "10": torque_status, "11": angle_status,
-            "12": f"{int(torque_min*100):06d}", "13": f"{int(torque_max*100):06d}",
-            "14": f"{int(target_torque*100):06d}", "15": f"{int(actual_torque*100):06d}",
-            "16": f"{int(angle_min):05d}", "17": f"{int(angle_max):05d}",
-            "18": f"{int(target_angle):05d}", "19": f"{int(actual_angle):05d}",
-            "20": timestamp_str, "21": pset_change_ts, "22": batch_status,
-            "23": tightening_id_str
+        result_params = {
+            'cell_id': 1,
+            'channel_id': 1,
+            'controller_name': self.controller_name,
+            'vin': self.current_vin.ljust(25)[:25],
+            'job_id': 0,
+            'pset_id': (self.current_pset if self.current_pset else "0").rjust(3, '0'),
+            'batch_size': current_target_batch_size,
+            'batch_counter': batch_counter_val,
+            'status': status,
+            'torque_status': torque_status,
+            'angle_status': angle_status,
+            'torque_min': int(torque_min * 100),
+            'torque_max': int(torque_max * 100),
+            'torque_target': int(target_torque * 100),
+            'torque_final': int(actual_torque * 100),
+            'angle_min': int(angle_min),
+            'angle_max': int(angle_max),
+            'angle_target': int(target_angle),
+            'angle_final': int(actual_angle),
+            'timestamp': timestamp_str,
+            'pset_change_time': pset_change_ts,
+            'batch_status': batch_status,
+            'tightening_id': self.tightening_id_counter,
         }
-        data = "".join([f"{pid}{pval}" for pid, pval in params.items()])
 
-        result_msg = build_message(61, rev=1, data=data, no_ack=self.result_no_ack)
+        data = self._build_mid0061_data(self.result_subscribed_rev, result_params)
+        result_msg = build_message(61, rev=self.result_subscribed_rev, data=data, no_ack=self.result_no_ack)
         self.send_to_client(result_msg)
-        # Update print statement to show the batch size being used
-        print(f"[Tightening] Sent result (MID 0061, ID: {tightening_id_str}). Status: {'OK' if status == '1' else 'NOK'}, Batch: {batch_counter_val}/{current_target_batch_size}")
+        print(f"[Tightening] Sent result (MID 0061 rev {self.result_subscribed_rev}, ID: {self.tightening_id_counter:010d}). Status: {'OK' if status == '1' else 'NOK'}, Batch: {batch_counter_val}/{current_target_batch_size}")
 
         if batch_completed:
             print("[Batch] Batch complete!")
