@@ -195,6 +195,9 @@ class OpenProtocolEmulator:
             62: self._handle_mid_0062,
             63: self._handle_mid_0063,
             82: self._handle_mid_0082,
+            100: self._handle_mid_0100,
+            102: self._handle_mid_0102,
+            103: self._handle_mid_0103,
         }
 
     def _get_response_revision(self, mid: int, requested_rev: int) -> int:
