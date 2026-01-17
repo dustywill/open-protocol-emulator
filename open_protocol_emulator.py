@@ -522,6 +522,23 @@ class OpenProtocolEmulator:
 
         self.send_to_client(resp)
 
+    def _handle_mid_0102(self, mid_int: int, rev: str, no_ack_flag: str, data_field: str, msg: bytes):
+        """MID 0102: Multi-spindle result acknowledge."""
+        print("[MultiSpindle] Result acknowledged by client (MID 0102).")
+
+    def _handle_mid_0103(self, mid_int: int, rev: str, no_ack_flag: str, data_field: str, msg: bytes):
+        """MID 0103: Multi-spindle result unsubscribe."""
+        if self.multi_spindle_subscribed:
+            self.multi_spindle_subscribed = False
+            self.multi_spindle_no_ack = False
+            resp = build_message(5, rev=1, data="0103")
+            print("[MultiSpindle] Unsubscribed from multi-spindle results.")
+        else:
+            error_data = self._build_mid0004_data(1, 103, 10)
+            resp = build_message(4, rev=1, data=error_data)
+            print("[MultiSpindle] Unsubscribe failed: not subscribed.")
+        self.send_to_client(resp)
+
     def _initialize_default_pset_parameters(self):
         """Initializes default parameters for available Psets."""
         default_params = {
@@ -806,6 +823,8 @@ class OpenProtocolEmulator:
         print(f"[Client] Cleaning up connection from {addr}.")
         self.session_active = False
         self.vin_subscribed = False; self.result_subscribed = False; self.pset_subscribed = False
+        self.multi_spindle_subscribed = False
+        self.multi_spindle_no_ack = False
         self.pset_subscribed_rev = 1
         self.vin_subscribed_rev = 1
         self.result_subscribed_rev = 1
