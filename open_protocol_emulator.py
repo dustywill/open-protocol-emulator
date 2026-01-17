@@ -662,6 +662,10 @@ class OpenProtocolEmulator:
 
         self.send_to_client(resp)
 
+    def _handle_mid_0218(self, mid_int: int, rev: str, no_ack_flag: str, data_field: str, msg: bytes):
+        """MID 0218: Relay function acknowledge."""
+        print("[Relay] Relay function acknowledged by client (MID 0218).")
+
     def _handle_mid_0219(self, mid_int: int, rev: str, no_ack_flag: str, data_field: str, msg: bytes):
         """MID 0219: Relay function unsubscribe."""
         relay_func = data_field[:3] if len(data_field) >= 3 else "000"
