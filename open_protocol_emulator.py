@@ -390,29 +390,28 @@ class OpenProtocolEmulator:
         resp = build_message(5, rev=1, data="0050")
         self.send_to_client(resp)
         if self.vin_subscribed:
-            vin_param = self.current_vin.ljust(25)[:25]
-            vin_data = build_message(52, rev=1, data=vin_param, no_ack=self.vin_no_ack)
-            self.send_to_client(vin_data)
-            print(f"[VIN] Sent VIN update (MID 0052): {self.current_vin}")
+            vin_data = self._build_mid0052_data(self.vin_subscribed_rev)
+            vin_msg = build_message(52, rev=self.vin_subscribed_rev, data=vin_data, no_ack=self.vin_no_ack)
+            self.send_to_client(vin_msg)
+            print(f"[VIN] Sent VIN update (MID 0052 rev {self.vin_subscribed_rev}): {self.current_vin}")
 
     def _handle_mid_0051(self, mid_int, rev, no_ack_flag, data_field, msg):
         req_rev = int(rev) if rev.strip() else 1
-        if req_rev > 1:
-            error_data = self._build_mid0004_data(1, 51, 97)
-            resp = build_message(4, rev=1, data=error_data)
-        elif self.vin_subscribed:
+        if self.vin_subscribed:
             error_data = self._build_mid0004_data(1, 51, 6)
             resp = build_message(4, rev=1, data=error_data)
         else:
+            subscribed_rev = self._get_response_revision(52, req_rev)
+            self.vin_subscribed_rev = subscribed_rev
             self.vin_subscribed = True
             self.vin_no_ack = (no_ack_flag == "1")
             resp = build_message(5, rev=1, data="0051")
-            print("[VIN] Subscription accepted.")
+            print(f"[VIN] Subscription accepted (will send MID 0052 rev {subscribed_rev}).")
             if self.current_vin:
-                vin_param = self.current_vin.ljust(25)[:25]
-                vin_data = build_message(52, rev=1, data=vin_param, no_ack=self.vin_no_ack)
-                self.send_to_client(vin_data)
-                print(f"[VIN] Sent current VIN (MID 0052): {self.current_vin}")
+                vin_data = self._build_mid0052_data(self.vin_subscribed_rev)
+                vin_msg = build_message(52, rev=self.vin_subscribed_rev, data=vin_data, no_ack=self.vin_no_ack)
+                self.send_to_client(vin_msg)
+                print(f"[VIN] Sent current VIN (MID 0052 rev {self.vin_subscribed_rev}): {self.current_vin}")
         self.send_to_client(resp)
 
     def _handle_mid_0053(self, mid_int, rev, no_ack_flag, data_field, msg):
@@ -607,10 +606,10 @@ class OpenProtocolEmulator:
             print(f"[VIN Increment] New VIN: {self.current_vin}")
 
             if self.vin_subscribed and self.session_active:
-                vin_param = self.current_vin.ljust(25)[:25]
-                vin_data = build_message(52, rev=1, data=vin_param, no_ack=self.vin_no_ack)
-                threading.Thread(target=self.send_to_client, args=(vin_data,), daemon=True).start()
-                print(f"[VIN] Sent VIN update event (MID 0052): {self.current_vin}")
+                vin_data = self._build_mid0052_data(self.vin_subscribed_rev)
+                vin_msg = build_message(52, rev=self.vin_subscribed_rev, data=vin_data, no_ack=self.vin_no_ack)
+                threading.Thread(target=self.send_to_client, args=(vin_msg,), daemon=True).start()
+                print(f"[VIN] Sent VIN update event (MID 0052 rev {self.vin_subscribed_rev}): {self.current_vin}")
 
         except ValueError:
             print("[VIN Increment] Error: Could not increment VIN numeric part.")
