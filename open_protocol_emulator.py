@@ -462,6 +462,26 @@ class OpenProtocolEmulator:
             resp = build_message(4, rev=1, data=error_data)
         self.send_to_client(resp)
 
+    # === Time MID Handlers ===
+
+    def _handle_mid_0082(self, mid_int: int, rev: str, no_ack_flag: str, data_field: str, msg: bytes):
+        time_str = data_field.strip()
+        if len(time_str) == 19:
+            try:
+                datetime.datetime.strptime(time_str, "%Y-%m-%d:%H:%M:%S")
+                self.controller_time = time_str
+                resp = build_message(5, rev=1, data="0082")
+                print(f"[Time] Controller time set to: {time_str}")
+            except ValueError:
+                error_data = self._build_mid0004_data(1, 82, 20)
+                resp = build_message(4, rev=1, data=error_data)
+                print(f"[Time] Invalid time format received: {time_str}")
+        else:
+            error_data = self._build_mid0004_data(1, 82, 20)
+            resp = build_message(4, rev=1, data=error_data)
+            print(f"[Time] Invalid time length received: {len(time_str)} chars (expected 19)")
+        self.send_to_client(resp)
+
     def _initialize_default_pset_parameters(self):
         """Initializes default parameters for available Psets."""
         default_params = {
