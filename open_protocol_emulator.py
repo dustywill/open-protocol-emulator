@@ -247,6 +247,7 @@ class OpenProtocolEmulator:
         self.vin_subscribed = False
         self.result_subscribed = False
         self.pset_subscribed = False
+        self.pset_subscribed_rev = 1
         try:
             if self.client_socket:
                 self.client_socket.close()
@@ -291,6 +292,7 @@ class OpenProtocolEmulator:
     def _handle_mid_0017(self, mid_int, rev, no_ack_flag, data_field, msg):
         if self.pset_subscribed:
             self.pset_subscribed = False
+            self.pset_subscribed_rev = 1
             resp = build_message(5, rev=1, data="0017")
             print("[Pset] Unsubscribed from Pset selection.")
         else:
@@ -632,6 +634,7 @@ class OpenProtocolEmulator:
         print(f"[Client] Cleaning up connection from {addr}.")
         self.session_active = False
         self.vin_subscribed = False; self.result_subscribed = False; self.pset_subscribed = False
+        self.pset_subscribed_rev = 1
         try: sock.close()
         except OSError: pass
         self.client_socket = None
