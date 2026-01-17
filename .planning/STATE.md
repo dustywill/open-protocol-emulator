@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-16)
 
 **Core value:** Correct Open Protocol message formats that match the official specification exactly
-**Current focus:** Phase 5 — New MID Implementation
+**Current focus:** Phase 6 — Revision Configuration
 
 ## Current Position
 
-Phase: 5 of 7 (New MID Implementation)
-Plan: 3 of 3 in current phase
-Status: Phase complete
-Last activity: 2026-01-16 — Completed 05-03-PLAN.md
+Phase: 6 of 7 (Revision Configuration)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-17 — Completed 06-01-PLAN.md
 
-Progress: █████████░ 89%
+Progress: █████████░ 94%
 
 ## Performance Metrics
 
@@ -80,6 +80,8 @@ Recent decisions affecting current work:
 | 05-03 | MID 0215 rev 1 uses fixed 8+8 format, rev 2 uses variable count | Per Open Protocol spec for different I/O device types |
 | 05-03 | Relay subscription sends immediate MID 0217 status | Per spec: controller sends current status after subscription accept |
 | 05-03 | Multiple relay subscriptions tracked in dictionary | Allow monitoring multiple relay functions simultaneously |
+| 06-01 | Use instance dictionary for revision config | Enables runtime modification per emulator instance |
+| 06-01 | Return copy in get_all_revision_config() | Prevents external code from mutating internal state |
 
 ### Deferred Issues
 
@@ -91,7 +93,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-16
-Stopped at: Completed 05-03-PLAN.md (Phase 5 complete)
+Last session: 2026-01-17
+Stopped at: Completed 06-01-PLAN.md
 Resume file: None
-Next: Phase 6 (Testing and Validation)
+Next: 06-02-PLAN.md (Controller profiles)
