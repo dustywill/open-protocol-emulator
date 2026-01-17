@@ -90,6 +90,7 @@ class OpenProtocolEmulator:
         self.client_socket = None
         self.send_lock = threading.Lock()
         self.tightening_id_counter = 0
+        self.controller_time = None
 
         # --- Controller Info for MID 0002 Revisions 2+ ---
         self.supplier_code = 1
