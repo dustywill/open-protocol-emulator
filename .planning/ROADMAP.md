@@ -132,7 +132,7 @@ Key work:
 - Implement MID 0216-0218 - Relay functions
 
 Plans:
-- [ ] 05-01: Implement MID 0082 (set time)
+- [x] 05-01: Implement MID 0082 (set time)
 - [ ] 05-02: Implement MID 0100-0102 (multi-spindle)
 - [ ] 05-03: Implement MID 0214-0218 (I/O and relay)
 
@@ -180,6 +180,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 3.5 → 4 → 5 → 6 → 7
 | 3. MID Format Fixes | 3/3 | Complete | 2026-01-16 |
 | 3.5. Architecture Refactor | 1/1 | Complete | 2026-01-16 |
 | 4. Multi-Revision Implementation | 5/5 | Complete | 2026-01-16 |
-| 5. New MID Implementation | 0/3 | Planned | - |
+| 5. New MID Implementation | 1/3 | In progress | - |
 | 6. Revision Configuration | 0/2 | Not started | - |
 | 7. GUI Expansion | 0/2 | Not started | - |
