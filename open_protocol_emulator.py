@@ -74,6 +74,7 @@ class OpenProtocolEmulator:
         self.auto_loop_interval = 20
         self.pset_last_change = None
         self.pset_subscribed = False
+        self.pset_subscribed_rev = 1
         self.client_socket = None
         self.send_lock = threading.Lock()
         self.tightening_id_counter = 0
@@ -270,14 +271,17 @@ class OpenProtocolEmulator:
             error_data = self._build_mid0004_data(1, 14, 6)
             resp = build_message(4, rev=1, data=error_data)
         else:
+            requested_rev = int(rev) if rev.strip() else 1
+            subscribed_rev = self._get_response_revision(15, requested_rev)
+            self.pset_subscribed_rev = subscribed_rev
             self.pset_subscribed = True
             resp = build_message(5, rev=1, data="0014")
-            print("[Pset] Pset subscription accepted.")
+            print(f"[Pset] Pset subscription accepted (will send MID 0015 rev {subscribed_rev}).")
             if self.current_pset:
-                mid15_data = self._build_mid15_data()
-                mid15_msg = build_message(15, rev=1, data=mid15_data)
+                mid15_data = self._build_mid0015_data(self.pset_subscribed_rev)
+                mid15_msg = build_message(15, rev=self.pset_subscribed_rev, data=mid15_data)
                 self.send_to_client(mid15_msg)
-                print(f"[Pset] Sent current Pset (MID 0015): {self.current_pset}")
+                print(f"[Pset] Sent current Pset (MID 0015 rev {self.pset_subscribed_rev}): {self.current_pset}")
         self.send_to_client(resp)
 
     def _handle_mid_0016(self, mid_int, rev, no_ack_flag, data_field, msg):
