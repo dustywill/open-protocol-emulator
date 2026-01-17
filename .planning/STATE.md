@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 ## Current Position
 
 Phase: 6 of 7 (Revision Configuration)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-01-17 — Completed 06-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-01-17 — Completed 06-02-PLAN.md
 
 Progress: █████████░ 94%
 
@@ -82,6 +82,8 @@ Recent decisions affecting current work:
 | 05-03 | Multiple relay subscriptions tracked in dictionary | Allow monitoring multiple relay functions simultaneously |
 | 06-01 | Use instance dictionary for revision config | Enables runtime modification per emulator instance |
 | 06-01 | Return copy in get_all_revision_config() | Prevents external code from mutating internal state |
+| 06-02 | Use class constant DEFAULT_PROFILES for built-in profiles | Shared across instances, immutable preset configurations |
+| 06-02 | Import json inside methods for profile persistence | Matches existing _load_pset_parameters pattern |
 
 ### Deferred Issues
 
@@ -94,6 +96,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 06-01-PLAN.md
+Stopped at: Completed 06-02-PLAN.md (Phase 6 complete)
 Resume file: None
-Next: 06-02-PLAN.md (Controller profiles)
+Next: Phase 7 - GUI Expansion
