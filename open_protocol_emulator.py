@@ -1600,6 +1600,63 @@ class OpenProtocolEmulator:
                         status = "OK" if data[55] == "1" else "NOK"
                         fields.append(f"Status={status}")
                     return " | ".join(fields) if fields else None
+                elif mid == "0217":
+                    if len(data) >= 8:
+                        relay_func = data[2:5] if data[0:2] == "01" else data[:3]
+                        status = data[7] if len(data) > 7 and data[5:7] == "02" else data[3] if len(data) > 3 else "?"
+                        status_text = "ON" if status == "1" else "OFF"
+                        return f"Relay={relay_func} Status={status_text}"
+                    return None
+                elif mid == "0218":
+                    return "Relay Ack"
+                elif mid == "0216":
+                    if len(data) >= 3:
+                        return f"Subscribe Relay={data[:3]}"
+                    return "Subscribe Relay"
+                elif mid == "0219":
+                    if len(data) >= 3:
+                        return f"Unsubscribe Relay={data[:3]}"
+                    return "Unsubscribe Relay"
+                elif mid == "0215":
+                    fields = []
+                    if len(data) >= 4 and data[0:2] == "01":
+                        fields.append(f"Device={data[2:4]}")
+                    return " | ".join(fields) if fields else "I/O Status"
+                elif mid == "0214":
+                    if len(data) >= 2:
+                        return f"Request I/O Device={data[:2]}"
+                    return "Request I/O Status"
+                elif mid == "0040":
+                    return "Request Tool Data"
+                elif mid == "0041":
+                    fields = []
+                    if len(data) >= 16 and data[0:2] == "01":
+                        fields.append(f"Serial={data[2:16].strip()}")
+                    return " | ".join(fields) if fields else "Tool Data"
+                elif mid == "0042":
+                    return "Disable Tool"
+                elif mid == "0043":
+                    return "Enable Tool"
+                elif mid == "0051":
+                    return "Subscribe VIN"
+                elif mid == "0053":
+                    return "VIN Ack"
+                elif mid == "0054":
+                    return "Unsubscribe VIN"
+                elif mid == "0016":
+                    return "Pset Ack"
+                elif mid == "0017":
+                    return "Unsubscribe Pset"
+                elif mid == "0062":
+                    return "Result Ack"
+                elif mid == "0063":
+                    return "Unsubscribe Results"
+                elif mid == "0100":
+                    return "Subscribe Multi-Spindle"
+                elif mid == "0102":
+                    return "Multi-Spindle Ack"
+                elif mid == "0103":
+                    return "Unsubscribe Multi-Spindle"
             except (ValueError, IndexError):
                 pass
             return None
