@@ -76,6 +76,12 @@ class OpenProtocolEmulator:
         self.vin_subscribed_rev = 1
         self.result_subscribed = False
         self.result_no_ack = False
+        self.result_subscribed_rev = 1
+        # Extended tightening result data (for MID 0061 rev 3+)
+        self.strategy_code = 0
+        self.strategy_options = "00000"
+        self.tightening_error_status_2 = 0
+        self.stage_result_count = 0
         self.auto_loop_interval = 20
         self.pset_last_change = None
         self.pset_subscribed = False
@@ -700,6 +706,7 @@ class OpenProtocolEmulator:
         self.vin_subscribed = False; self.result_subscribed = False; self.pset_subscribed = False
         self.pset_subscribed_rev = 1
         self.vin_subscribed_rev = 1
+        self.result_subscribed_rev = 1
         try: sock.close()
         except OSError: pass
         self.client_socket = None
