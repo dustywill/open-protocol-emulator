@@ -41,6 +41,7 @@ class OpenProtocolEmulator:
     MAX_REV_0052 = 2
     MAX_REV_0061 = 7
     MAX_REV_0101 = 5
+    MAX_REV_0215 = 2
 
     # Added port and name to constructor with defaults
     def __init__(self, host='0.0.0.0', port=4545, controller_name="OpenProtocolSim"):
@@ -85,6 +86,33 @@ class OpenProtocolEmulator:
         self.sync_tightening_id = 0
         self.num_spindles = 2
         # --- End Multi-spindle State ---
+        # --- I/O Device and Relay State ---
+        self.io_devices = {
+            "00": {
+                "relays": [
+                    {"function": 1, "status": 0},
+                    {"function": 2, "status": 0},
+                    {"function": 9, "status": 0},
+                    {"function": 10, "status": 0},
+                    {"function": 18, "status": 1},
+                    {"function": 19, "status": 1},
+                    {"function": 30, "status": 0},
+                    {"function": 0, "status": 0},
+                ],
+                "digital_inputs": [
+                    {"function": 0, "status": 0},
+                    {"function": 0, "status": 0},
+                    {"function": 0, "status": 0},
+                    {"function": 0, "status": 0},
+                    {"function": 0, "status": 0},
+                    {"function": 0, "status": 0},
+                    {"function": 0, "status": 0},
+                    {"function": 0, "status": 0},
+                ]
+            }
+        }
+        self.relay_subscriptions = {}
+        # --- End I/O Device and Relay State ---
         # Extended tightening result data (for MID 0061 rev 3+)
         self.strategy_code = 0
         self.strategy_options = "00000"
