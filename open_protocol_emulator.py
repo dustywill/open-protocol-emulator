@@ -75,6 +75,7 @@ class OpenProtocolEmulator:
         self.pset_last_change = None
         self.pset_subscribed = False
         self.pset_subscribed_rev = 1
+        self.pset_ok_counter = 0
         self.client_socket = None
         self.send_lock = threading.Lock()
         self.tightening_id_counter = 0
@@ -302,23 +303,25 @@ class OpenProtocolEmulator:
         if pset_id == "0" or pset_id == "000":
             self.current_pset = "0"
             self.pset_last_change = datetime.datetime.now()
+            self.pset_ok_counter = 0
             resp = build_message(5, rev=1, data="0018")
             print("[Pset] No Pset selected (Pset 0).")
             if self.pset_subscribed:
-                mid15_data = self._build_mid15_data()
-                mid15_msg = build_message(15, rev=1, data=mid15_data)
+                mid15_data = self._build_mid0015_data(self.pset_subscribed_rev)
+                mid15_msg = build_message(15, rev=self.pset_subscribed_rev, data=mid15_data)
                 self.send_to_client(mid15_msg)
-                print("[Pset] Sent MID 0015: Pset 0")
+                print(f"[Pset] Sent MID 0015 rev {self.pset_subscribed_rev}: Pset 0")
         elif pset_id in self.available_psets:
             self.current_pset = pset_id
             self.pset_last_change = datetime.datetime.now()
+            self.pset_ok_counter = 0
             resp = build_message(5, rev=1, data="0018")
             print(f"[Pset] Pset {pset_id} selected.")
             if self.pset_subscribed:
-                mid15_data = self._build_mid15_data()
-                mid15_msg = build_message(15, rev=1, data=mid15_data)
+                mid15_data = self._build_mid0015_data(self.pset_subscribed_rev)
+                mid15_msg = build_message(15, rev=self.pset_subscribed_rev, data=mid15_data)
                 self.send_to_client(mid15_msg)
-                print(f"[Pset] Sent MID 0015: {self.current_pset}")
+                print(f"[Pset] Sent MID 0015 rev {self.pset_subscribed_rev}: {self.current_pset}")
         else:
             error_data = self._build_mid0004_data(1, 18, 2)
             resp = build_message(4, rev=1, data=error_data)
@@ -485,9 +488,29 @@ class OpenProtocolEmulator:
             print(f"[Pset Params] Error saving parameters to {filename}: {e}")
 
 
-    def _build_mid15_data(self):
-        pset_id = self.current_pset.rjust(3, '0') if self.current_pset else "000"
+    def _build_mid0015_data(self, revision: int) -> str:
+        """Build MID 0015 Pset selected data for given revision (1-2)."""
+        pset_id = (self.current_pset if self.current_pset else "0").rjust(3, '0')
         date_str = self.pset_last_change.strftime("%Y-%m-%d:%H:%M:%S") if self.pset_last_change else datetime.datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+
+        if revision == 1:
+            return pset_id + date_str
+
+        elif revision >= 2:
+            pset_params = self.pset_parameters.get(self.current_pset, {})
+            batch_size = pset_params.get("batch_size", self.target_batch_size)
+            with self.state_lock:
+                batch_counter = self.batch_counter
+                ok_counter = self.pset_ok_counter
+
+            fields = []
+            fields.append(f"01{pset_id}")
+            fields.append(f"02{date_str}")
+            fields.append(f"03{batch_size:04d}")
+            fields.append(f"04{batch_counter:04d}")
+            fields.append(f"05{ok_counter:04d}")
+            return "".join(fields)
+
         return pset_id + date_str
 
     def _parse_vin(self, vin_string):
@@ -700,9 +723,11 @@ class OpenProtocolEmulator:
 
 
         with self.state_lock:
-            if status == "1" and current_target_batch_size > 0:
-                self.batch_counter += 1
-                print(f"[Batch] Counter incremented to {self.batch_counter}/{current_target_batch_size}")
+            if status == "1":
+                self.pset_ok_counter += 1
+                if current_target_batch_size > 0:
+                    self.batch_counter += 1
+                    print(f"[Batch] Counter incremented to {self.batch_counter}/{current_target_batch_size}")
 
             batch_counter_val = self.batch_counter
             if current_target_batch_size == 0:
