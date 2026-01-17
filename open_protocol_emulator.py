@@ -345,10 +345,15 @@ class OpenProtocolEmulator:
     # === Tool Control MID Handlers ===
 
     def _handle_mid_0040(self, mid_int, rev, no_ack_flag, data_field, msg):
-        print("[Tool] Received Disable Tool Command (MID 0040) from client (unexpected). Ignoring.")
+        requested_rev = int(rev) if rev.strip() else 1
+        response_rev = self._get_response_revision(41, requested_rev)
+        tool_data = self._build_mid0041_data(response_rev)
+        resp = build_message(41, rev=response_rev, data=tool_data)
+        self.send_to_client(resp)
+        print(f"[Tool] Sent tool data (MID 0041 rev {response_rev})")
 
     def _handle_mid_0041(self, mid_int, rev, no_ack_flag, data_field, msg):
-        print("[Tool] Received Enable Tool Command (MID 0041) from client (unexpected). Ignoring.")
+        print("[Tool] Received MID 0041 from client (unexpected - this is a controller response). Ignoring.")
 
     def _handle_mid_0042(self, mid_int, rev, no_ack_flag, data_field, msg):
         print("[Tool] Received Request Tool Disable (MID 0042).")
@@ -528,6 +533,32 @@ class OpenProtocolEmulator:
             return "".join(fields)
 
         return pset_id + date_str
+
+    def _build_mid0041_data(self, revision: int) -> str:
+        """Build MID 0041 Tool Data response for given revision (1-5)."""
+        fields = []
+
+        fields.append(f"01{self.tool_serial_number.ljust(14)[:14]}")
+        fields.append(f"02{self.tool_number_of_tightenings:010d}")
+        fields.append(f"03{self.tool_last_calib_date}")
+        fields.append(f"04{self.tool_controller_serial}")
+
+        if revision >= 2:
+            fields.append(f"05{self.tool_calib_value:06d}")
+            fields.append(f"06{self.tool_last_service_date}")
+            fields.append(f"07{self.tool_tightenings_since_service:010d}")
+
+        if revision >= 3:
+            fields.append(f"08{self.tool_type:02d}")
+            fields.append(f"09{self.tool_motor_size:04d}")
+
+        if revision >= 4:
+            fields.append(f"10{self.tool_open_end_data}")
+
+        if revision >= 5:
+            fields.append(f"11{self.tool_controller_software_version}")
+
+        return "".join(fields)
 
     def _parse_vin(self, vin_string):
         """Parses VIN into prefix and numeric parts."""
