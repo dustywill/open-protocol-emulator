@@ -570,6 +570,71 @@ class OpenProtocolEmulator:
             print("[MultiSpindle] Unsubscribe failed: not subscribed.")
         self.send_to_client(resp)
 
+    # === I/O Device MID Handlers ===
+
+    def _handle_mid_0214(self, mid_int: int, rev: str, no_ack_flag: str, data_field: str, msg: bytes):
+        """MID 0214: I/O device status request (Rev 1-2)."""
+        device_num = data_field[:2] if len(data_field) >= 2 else "00"
+        req_rev = int(rev.strip()) if rev.strip() else 1
+
+        if req_rev > self.MAX_REV_0215:
+            error_data = self._build_mid0004_data(1, 214, 97)
+            resp = build_message(4, rev=1, data=error_data)
+            print(f"[IO] Revision {req_rev} not supported for MID 0214.")
+        elif device_num not in self.io_devices:
+            error_data = self._build_mid0004_data(1, 214, 1)
+            resp = build_message(4, rev=1, data=error_data)
+            print(f"[IO] Device {device_num} not found.")
+        else:
+            device = self.io_devices[device_num]
+            relays = device["relays"]
+            digital_inputs = device["digital_inputs"]
+
+            if req_rev == 1:
+                fields = []
+                fields.append(f"01{device_num}")
+
+                relay_data = ""
+                for relay in relays[:8]:
+                    relay_data += f"{relay['function']:03d}{relay['status']}"
+                while len(relay_data) < 32:
+                    relay_data += "0000"
+                fields.append(f"02{relay_data}")
+
+                din_data = ""
+                for din in digital_inputs[:8]:
+                    din_data += f"{din['function']:03d}{din['status']}"
+                while len(din_data) < 32:
+                    din_data += "0000"
+                fields.append(f"03{din_data}")
+
+                data = "".join(fields)
+                resp = build_message(215, rev=1, data=data)
+
+            else:
+                fields = []
+                fields.append(f"01{device_num}")
+                fields.append(f"02{len(relays):02d}")
+
+                relay_data = ""
+                for relay in relays:
+                    relay_data += f"{relay['function']:03d}{relay['status']}"
+                fields.append(f"03{relay_data}")
+
+                fields.append(f"04{len(digital_inputs):02d}")
+
+                din_data = ""
+                for din in digital_inputs:
+                    din_data += f"{din['function']:03d}{din['status']}"
+                fields.append(f"05{din_data}")
+
+                data = "".join(fields)
+                resp = build_message(215, rev=2, data=data)
+
+            print(f"[IO] Sent device {device_num} status (MID 0215 rev {req_rev}).")
+
+        self.send_to_client(resp)
+
     def _initialize_default_pset_parameters(self):
         """Initializes default parameters for available Psets."""
         default_params = {
