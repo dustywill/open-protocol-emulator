@@ -96,6 +96,20 @@ class OpenProtocolEmulator:
         self.client_id = 1
         # --- End Controller Info ---
 
+        # --- Tool Info for MID 0041 Revisions 2+ ---
+        self.tool_serial_number = "TOOL123456789012"
+        self.tool_number_of_tightenings = 0
+        self.tool_last_calib_date = "2025-01-01"
+        self.tool_controller_serial = self.ctrl_serial
+        self.tool_calib_value = 10000
+        self.tool_last_service_date = "2025-01-01"
+        self.tool_tightenings_since_service = 0
+        self.tool_type = 1
+        self.tool_motor_size = 100
+        self.tool_open_end_data = "                    "
+        self.tool_controller_software_version = self.ctrl_sw_version
+        # --- End Tool Info ---
+
         # --- Pset Parameters Storage ---
         self.pset_parameters = {}
         self._load_pset_parameters(self.controller_name) # Attempt to load from file using controller name
@@ -726,6 +740,9 @@ class OpenProtocolEmulator:
 
 
         with self.state_lock:
+            self.tool_number_of_tightenings += 1
+            self.tool_tightenings_since_service += 1
+
             if status == "1":
                 self.pset_ok_counter += 1
                 if current_target_batch_size > 0:
