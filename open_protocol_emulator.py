@@ -40,6 +40,7 @@ class OpenProtocolEmulator:
     MAX_REV_0041 = 5
     MAX_REV_0052 = 2
     MAX_REV_0061 = 7
+    MAX_REV_0101 = 5
 
     # Added port and name to constructor with defaults
     def __init__(self, host='0.0.0.0', port=4545, controller_name="OpenProtocolSim"):
@@ -77,6 +78,13 @@ class OpenProtocolEmulator:
         self.result_subscribed = False
         self.result_no_ack = False
         self.result_subscribed_rev = 1
+        # --- Multi-spindle State ---
+        self.multi_spindle_subscribed = False
+        self.multi_spindle_no_ack = False
+        self.multi_spindle_requested_rev = 1
+        self.sync_tightening_id = 0
+        self.num_spindles = 2
+        # --- End Multi-spindle State ---
         # Extended tightening result data (for MID 0061 rev 3+)
         self.strategy_code = 0
         self.strategy_options = "00000"
