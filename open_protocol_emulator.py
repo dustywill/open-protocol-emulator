@@ -5,7 +5,7 @@ import time
 import datetime
 import random
 import tkinter as tk
-from tkinter import messagebox, filedialog
+from tkinter import ttk, messagebox, filedialog
 import re
 import argparse
 import os
@@ -1069,13 +1069,17 @@ class OpenProtocolEmulator:
                 try:
                     self.client_socket.sendall(msg_bytes)
                     log_msg = msg_bytes.decode('ascii', errors='ignore').replace('\x00', '')
-                    print(f"[Send] MID {log_msg[4:8]} ({len(msg_bytes)} bytes): {log_msg[20:60]}...")
+                    mid = log_msg[4:8]
+                    data = log_msg[20:]
+                    print(f"[Send] MID {mid} ({len(msg_bytes)} bytes): {data[:60]}...")
+                    if hasattr(self, '_gui_log_message'):
+                        self._gui_log_message("send", mid, len(msg_bytes), data)
                 except (OSError, BrokenPipeError, ConnectionResetError) as e:
                     print(f"[Send Error] Connection issue: {e}")
                     try: self.client_socket.close()
                     except OSError: pass
                     self.client_socket = None
-                    self.session_active = False # Ensure session ends on error
+                    self.session_active = False
                 except Exception as e:
                     print(f"[Send Error] Unexpected error: {e}")
                     try: self.client_socket.close()
@@ -1102,7 +1106,11 @@ class OpenProtocolEmulator:
 
                 full_msg = buffer[:length+1]
                 log_msg_recv = full_msg.decode('ascii', errors='ignore').replace('\x00', '')
-                print(f"[Recv] MID {log_msg_recv[4:8]} ({len(full_msg)} bytes): {log_msg_recv[20:60]}...")
+                mid = log_msg_recv[4:8]
+                data = log_msg_recv[20:]
+                print(f"[Recv] MID {mid} ({len(full_msg)} bytes): {data[:60]}...")
+                if hasattr(self, '_gui_log_message'):
+                    self._gui_log_message("recv", mid, len(full_msg), data)
                 buffer = buffer[length+1:]
                 self.process_message(full_msg)
 
@@ -1249,6 +1257,9 @@ class OpenProtocolEmulator:
         self.send_to_client(result_msg)
         print(f"[Tightening] Sent result (MID 0061 rev {self.result_subscribed_rev}, ID: {self.tightening_id_counter:010d}). Status: {'OK' if status == '1' else 'NOK'}, Batch: {batch_counter_val}/{current_target_batch_size}")
 
+        if hasattr(self, '_gui_update_last_result'):
+            self._gui_update_last_result(status, actual_torque, actual_angle, self.tightening_id_counter)
+
         if batch_completed:
             print("[Batch] Batch complete!")
             self._increment_vin()
@@ -1370,26 +1381,148 @@ class OpenProtocolEmulator:
 
 
     def start_gui(self):
-        """Start a simple Tkinter GUI with VIN, Batch, and Tool controls."""
-        # Use configured name and port in title
+        """Start Tkinter GUI with tabbed configuration and persistent status/log panels."""
         window_title = f"{self.controller_name.strip()} (Port: {self.port})"
         root = tk.Tk()
         root.title(window_title)
+        root.geometry("1100x700")
+        root.minsize(900, 600)
+        root.configure(bg="#1a1a2e")
 
-        # --- GUI Variables ---
+        style = ttk.Style()
+        style.theme_use('clam')
+
+        style.configure(".",
+            background="#1a1a2e",
+            foreground="#e8e8e8",
+            fieldbackground="#16213e",
+            font=("Consolas", 9))
+
+        style.configure("TNotebook",
+            background="#1a1a2e",
+            borderwidth=0,
+            padding=0)
+        style.configure("TNotebook.Tab",
+            background="#16213e",
+            foreground="#8892b0",
+            padding=[16, 8],
+            font=("Consolas", 10, "bold"))
+        style.map("TNotebook.Tab",
+            background=[("selected", "#0f3460"), ("active", "#1a1a2e")],
+            foreground=[("selected", "#00d9ff"), ("active", "#e8e8e8")],
+            expand=[("selected", [0, 0, 0, 2])])
+
+        style.configure("TFrame", background="#1a1a2e")
+        style.configure("TLabel", background="#1a1a2e", foreground="#e8e8e8", font=("Consolas", 9))
+        style.configure("TButton",
+            background="#0f3460",
+            foreground="#00d9ff",
+            borderwidth=1,
+            focuscolor="#00d9ff",
+            font=("Consolas", 9, "bold"),
+            padding=[12, 6])
+        style.map("TButton",
+            background=[("active", "#1a4a7a"), ("pressed", "#00d9ff")],
+            foreground=[("pressed", "#1a1a2e")])
+
+        style.configure("TEntry",
+            fieldbackground="#16213e",
+            foreground="#e8e8e8",
+            insertcolor="#00d9ff",
+            borderwidth=1,
+            padding=[4, 4])
+
+        style.configure("TSpinbox",
+            fieldbackground="#16213e",
+            foreground="#e8e8e8",
+            arrowcolor="#00d9ff",
+            borderwidth=1)
+
+        style.configure("TCombobox",
+            fieldbackground="#16213e",
+            foreground="#e8e8e8",
+            arrowcolor="#00d9ff",
+            selectbackground="#0f3460",
+            selectforeground="#00d9ff")
+        style.map("TCombobox",
+            fieldbackground=[("readonly", "#16213e")],
+            selectbackground=[("readonly", "#0f3460")])
+
+        style.configure("TCheckbutton",
+            background="#1a1a2e",
+            foreground="#e8e8e8",
+            indicatorcolor="#16213e",
+            indicatorrelief="flat",
+            font=("Consolas", 9))
+        style.map("TCheckbutton",
+            indicatorcolor=[("selected", "#00d9ff"), ("active", "#0f3460")])
+
+        style.configure("TLabelframe",
+            background="#1a1a2e",
+            foreground="#00d9ff",
+            bordercolor="#0f3460",
+            relief="solid",
+            borderwidth=1)
+        style.configure("TLabelframe.Label",
+            background="#1a1a2e",
+            foreground="#00d9ff",
+            font=("Consolas", 10, "bold"))
+
+        style.configure("Status.TLabel",
+            background="#0f3460",
+            foreground="#e8e8e8",
+            font=("Consolas", 9),
+            padding=[8, 4])
+        style.configure("StatusValue.TLabel",
+            background="#0f3460",
+            foreground="#00d9ff",
+            font=("Consolas", 10, "bold"),
+            padding=[8, 4])
+        style.configure("StatusOK.TLabel",
+            background="#0f3460",
+            foreground="#00ff88",
+            font=("Consolas", 10, "bold"),
+            padding=[8, 4])
+        style.configure("StatusWarn.TLabel",
+            background="#0f3460",
+            foreground="#ffaa00",
+            font=("Consolas", 10, "bold"),
+            padding=[8, 4])
+        style.configure("StatusError.TLabel",
+            background="#0f3460",
+            foreground="#ff4757",
+            font=("Consolas", 10, "bold"),
+            padding=[8, 4])
+
+        style.configure("Control.TButton",
+            background="#16213e",
+            foreground="#e8e8e8",
+            font=("Consolas", 9),
+            padding=[10, 6])
+        style.map("Control.TButton",
+            background=[("active", "#1a4a7a"), ("pressed", "#00d9ff")],
+            foreground=[("pressed", "#1a1a2e")])
+
+        style.configure("Primary.TButton",
+            background="#0f3460",
+            foreground="#00d9ff",
+            font=("Consolas", 10, "bold"),
+            padding=[14, 8])
+        style.map("Primary.TButton",
+            background=[("active", "#1a4a7a"), ("pressed", "#00d9ff")],
+            foreground=[("pressed", "#1a1a2e")])
+
         vin_var = tk.StringVar(value=self.current_vin)
         batch_size_var = tk.StringVar(value=str(self.target_batch_size))
         nok_prob_var = tk.StringVar(value=str(int(self.nok_probability * 100)))
-        auto_loop_interval_var = tk.StringVar(value=str(self.auto_loop_interval)) # New variable for interval
-        auto_send_loop_status_var = tk.StringVar(value="Active")
-        pset_display_var = tk.StringVar(value="Pset: Not set")
-        conn_display_var = tk.StringVar(value="Status: Disconnected")
-        batch_display_var = tk.StringVar(value=f"Batch: {self.batch_counter}/{self.target_batch_size}")
-        vin_display_var = tk.StringVar(value=f"VIN: {self.current_vin}")
-        tool_protocol_status_var = tk.StringVar(value="Tool Status: Enabled")
-        # --- End GUI Variables ---
+        auto_loop_interval_var = tk.StringVar(value=str(self.auto_loop_interval))
+        auto_send_loop_status_var = tk.StringVar(value="ACTIVE")
+        pset_display_var = tk.StringVar(value="Not set")
+        conn_display_var = tk.StringVar(value="DISCONNECTED")
+        batch_display_var = tk.StringVar(value=f"{self.batch_counter}/{self.target_batch_size}")
+        vin_display_var = tk.StringVar(value=self.current_vin)
+        tool_protocol_status_var = tk.StringVar(value="ENABLED")
 
-        # --- Revision Configuration GUI Variables ---
         rev_mid_0002_var = tk.StringVar(value=str(self.revision_config.get(2, 6)))
         rev_mid_0004_var = tk.StringVar(value=str(self.revision_config.get(4, 3)))
         rev_mid_0015_var = tk.StringVar(value=str(self.revision_config.get(15, 2)))
@@ -1398,13 +1531,9 @@ class OpenProtocolEmulator:
         rev_mid_0061_var = tk.StringVar(value=str(self.revision_config.get(61, 7)))
         rev_mid_0101_var = tk.StringVar(value=str(self.revision_config.get(101, 5)))
         rev_mid_0215_var = tk.StringVar(value=str(self.revision_config.get(215, 2)))
-        # --- End Revision Configuration GUI Variables ---
 
-        # --- Profile GUI Variables ---
         profile_var = tk.StringVar(value=self.get_current_profile())
-        # --- End Profile GUI Variables ---
 
-        # --- Pset GUI Variables ---
         pset_id_var = tk.StringVar(value=list(self.available_psets)[0] if self.available_psets else "")
         pset_batch_size_var = tk.StringVar(value="")
         pset_target_torque_var = tk.StringVar(value="")
@@ -1413,10 +1542,160 @@ class OpenProtocolEmulator:
         pset_target_angle_var = tk.StringVar(value="")
         pset_angle_min_var = tk.StringVar(value="")
         pset_angle_max_var = tk.StringVar(value="")
-        # --- End Pset GUI Variables ---
 
+        log_to_file_var = tk.BooleanVar(value=False)
+        log_file_handle = [None]
+        hide_keepalive_var = tk.BooleanVar(value=False)
 
-        # --- GUI Callbacks ---
+        last_result_status_var = tk.StringVar(value="---")
+        last_result_torque_var = tk.StringVar(value="---")
+        last_result_angle_var = tk.StringVar(value="---")
+        last_result_id_var = tk.StringVar(value="---")
+
+        def parse_mid_fields(mid: str, data: str) -> str:
+            """Parse known MID data into human-readable field breakdown."""
+            try:
+                if mid == "0061":
+                    fields = []
+                    if len(data) >= 6 and data[0:2] == "01":
+                        fields.append(f"Cell={data[2:6]}")
+                    if len(data) >= 10 and data[6:8] == "02":
+                        fields.append(f"Ch={data[8:10]}")
+                    if len(data) >= 37 and data[10:12] == "03":
+                        fields.append(f"Ctrl={data[12:37].strip()}")
+                    if len(data) >= 64 and data[37:39] == "04":
+                        fields.append(f"VIN={data[39:64].strip()}")
+                    if len(data) >= 68 and data[64:66] == "05":
+                        fields.append(f"Job={data[66:68]}")
+                    if len(data) >= 73 and data[68:70] == "06":
+                        fields.append(f"Pset={data[70:73]}")
+                    if len(data) >= 79 and data[73:75] == "07":
+                        fields.append(f"BatchSz={data[75:79]}")
+                    if len(data) >= 85 and data[79:81] == "08":
+                        fields.append(f"BatchCnt={data[81:85]}")
+                    if len(data) >= 88 and data[85:87] == "09":
+                        status = "OK" if data[87] == "1" else "NOK"
+                        fields.append(f"Status={status}")
+                    if len(data) >= 91 and data[88:90] == "10":
+                        fields.append(f"TqSt={data[90]}")
+                    if len(data) >= 94 and data[91:93] == "11":
+                        fields.append(f"AngSt={data[93]}")
+                    if len(data) >= 102 and data[94:96] == "12":
+                        fields.append(f"TqMin={int(data[96:102])/100:.2f}")
+                    if len(data) >= 110 and data[102:104] == "13":
+                        fields.append(f"TqMax={int(data[104:110])/100:.2f}")
+                    if len(data) >= 118 and data[110:112] == "14":
+                        fields.append(f"TqTgt={int(data[112:118])/100:.2f}")
+                    if len(data) >= 126 and data[118:120] == "15":
+                        fields.append(f"TqFin={int(data[120:126])/100:.2f}")
+                    if len(data) >= 133 and data[126:128] == "16":
+                        fields.append(f"AngMin={data[128:133]}")
+                    if len(data) >= 140 and data[133:135] == "17":
+                        fields.append(f"AngMax={data[135:140]}")
+                    if len(data) >= 147 and data[140:142] == "18":
+                        fields.append(f"AngTgt={data[142:147]}")
+                    if len(data) >= 154 and data[147:149] == "19":
+                        fields.append(f"AngFin={data[149:154]}")
+                    if len(data) >= 175 and data[154:156] == "20":
+                        fields.append(f"Time={data[156:175]}")
+                    if len(data) >= 199 and data[178:180] == "22":
+                        fields.append(f"BatchSt={data[180]}")
+                    if len(data) >= 213 and data[181:183] == "23":
+                        fields.append(f"TightID={data[183:193]}")
+                    return " | ".join(fields) if fields else None
+                elif mid == "0052":
+                    if len(data) >= 27 and data[0:2] == "01":
+                        return f"VIN={data[2:27].strip()}"
+                    else:
+                        return f"VIN={data[:25].strip()}"
+                elif mid == "0015":
+                    if len(data) >= 5 and data[0:2] == "01":
+                        return f"Pset={data[2:5]}"
+                    else:
+                        return f"Pset={data[:3]}"
+                elif mid == "0002":
+                    fields = []
+                    if len(data) >= 6 and data[0:2] == "01":
+                        fields.append(f"Cell={data[2:6]}")
+                    if len(data) >= 10 and data[6:8] == "02":
+                        fields.append(f"Ch={data[8:10]}")
+                    if len(data) >= 37 and data[10:12] == "03":
+                        fields.append(f"Name={data[12:37].strip()}")
+                    return " | ".join(fields) if fields else None
+                elif mid == "0001":
+                    return "Communication Start Request"
+                elif mid == "0003":
+                    return "Communication Stop Request"
+                elif mid == "0005":
+                    if len(data) >= 4:
+                        return f"Ack for MID {data[:4]}"
+                    return "Command Accepted"
+                elif mid == "0004":
+                    if len(data) >= 6:
+                        return f"Error: MID={data[:4]} Code={data[4:6]}"
+                    return "Command Error"
+                elif mid == "0018":
+                    return f"Select Pset={data.strip()}"
+                elif mid == "0060":
+                    return "Subscribe to Results"
+                elif mid == "0014":
+                    return "Subscribe to Pset"
+                elif mid == "0050":
+                    return "Subscribe to VIN"
+                elif mid == "9999":
+                    return "Keep-Alive"
+                elif mid == "0101":
+                    fields = []
+                    if len(data) >= 4 and data[0:2] == "01":
+                        fields.append(f"Spindles={data[2:4]}")
+                    if len(data) >= 31 and data[4:6] == "02":
+                        fields.append(f"VIN={data[6:31].strip()}")
+                    if len(data) >= 42 and data[34:36] == "04":
+                        fields.append(f"Pset={data[36:39]}")
+                    if len(data) >= 70 and data[53:55] == "17":
+                        status = "OK" if data[55] == "1" else "NOK"
+                        fields.append(f"Status={status}")
+                    return " | ".join(fields) if fields else None
+            except (ValueError, IndexError):
+                pass
+            return None
+
+        def log_message(direction: str, mid: str, length: int, data: str):
+            if hide_keepalive_var.get() and mid == "9999":
+                return
+
+            timestamp = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+            prefix = ">>>" if direction == "send" else "<<<"
+            color_tag = "send" if direction == "send" else "recv"
+            log_line = f"{timestamp} {prefix} MID {mid} ({length}B): {data}\n"
+
+            parsed = parse_mid_fields(mid, data)
+            if parsed:
+                log_line += f"         {parsed}\n"
+
+            try:
+                log_text.configure(state='normal')
+                log_text.insert(tk.END, log_line, color_tag)
+                log_text.see(tk.END)
+                log_text.configure(state='disabled')
+
+                if log_to_file_var.get() and log_file_handle[0]:
+                    log_file_handle[0].write(log_line)
+                    log_file_handle[0].flush()
+            except tk.TclError:
+                pass
+
+        self._gui_log_message = log_message
+
+        def update_last_result(status: str, torque: float, angle: float, tightening_id: int):
+            status_text = "OK" if status == "1" else "NOK"
+            last_result_status_var.set(status_text)
+            last_result_torque_var.set(f"{torque:.2f} Nm")
+            last_result_angle_var.set(f"{angle:.0f}°")
+            last_result_id_var.set(str(tightening_id))
+
+        self._gui_update_last_result = update_last_result
+
         def apply_global_settings():
             try:
                 new_vin = vin_var.get()
@@ -1425,35 +1704,41 @@ class OpenProtocolEmulator:
                         self.current_vin = new_vin
                         with self.state_lock:
                             self.batch_counter = 0
-                        print(f"[GUI Apply] VIN set to {self.current_vin}, batch counter reset.")
+                        log_message("info", "----", 0, f"VIN set to {self.current_vin}")
                     else:
                         messagebox.showerror("Error", f"Invalid VIN format: {new_vin}")
                         vin_var.set(self.current_vin)
+                        return
 
-                # Global batch size is now less relevant, but keep for fallback or other uses
                 new_batch_size = int(batch_size_var.get())
                 if new_batch_size >= 0:
                     self.target_batch_size = new_batch_size
-                    print(f"[GUI Apply] Global Batch Size set to {self.target_batch_size}.")
-                else: messagebox.showerror("Error", "Batch Size must be >= 0"); batch_size_var.set(str(self.target_batch_size))
-
+                else:
+                    messagebox.showerror("Error", "Batch Size must be >= 0")
+                    batch_size_var.set(str(self.target_batch_size))
+                    return
 
                 new_nok_prob_pct = int(nok_prob_var.get())
                 if 0 <= new_nok_prob_pct <= 100:
                     self.nok_probability = new_nok_prob_pct / 100.0
-                    print(f"[GUI Apply] NOK Probability set to {self.nok_probability:.2f}")
-                else: messagebox.showerror("Error", "NOK % must be 0-100"); nok_prob_var.set(str(int(self.nok_probability * 100)))
+                else:
+                    messagebox.showerror("Error", "NOK % must be 0-100")
+                    nok_prob_var.set(str(int(self.nok_probability * 100)))
+                    return
 
-                new_interval = int(auto_loop_interval_var.get()) # Read new interval
+                new_interval = int(auto_loop_interval_var.get())
                 if new_interval > 0:
                     self.auto_loop_interval = new_interval
-                    print(f"[GUI Apply] Auto Loop Interval set to {self.auto_loop_interval} seconds.")
-                else: messagebox.showerror("Error", "Interval must be > 0"); auto_loop_interval_var.set(str(self.auto_loop_interval))
+                else:
+                    messagebox.showerror("Error", "Interval must be > 0")
+                    auto_loop_interval_var.set(str(self.auto_loop_interval))
+                    return
 
                 update_labels()
             except ValueError:
                 messagebox.showerror("Error", "Invalid number format for Batch Size, NOK %, or Interval.")
-                batch_size_var.set(str(self.target_batch_size)); nok_prob_var.set(str(int(self.nok_probability * 100)))
+                batch_size_var.set(str(self.target_batch_size))
+                nok_prob_var.set(str(int(self.nok_probability * 100)))
                 auto_loop_interval_var.set(str(self.auto_loop_interval))
 
         def load_pset_settings():
@@ -1514,26 +1799,76 @@ class OpenProtocolEmulator:
 
         def toggle_auto_send_loop():
             self.auto_send_loop_active = not self.auto_send_loop_active
-            new_status = "Active" if self.auto_send_loop_active else "Paused"
+            new_status = "ACTIVE" if self.auto_send_loop_active else "PAUSED"
             auto_send_loop_status_var.set(new_status)
-            print(f"[GUI] Auto-send loop {new_status}")
 
         def manual_send_result():
-            print("[GUI] Manual send triggered.")
             threading.Thread(target=self.send_single_tightening_result, daemon=True).start()
 
         def update_labels():
-            pset_display_var.set("Pset: " + (self.current_pset if self.current_pset else "Not set"))
-            conn_display_var.set("Status: " + ("Connected" if self.session_active else "Disconnected"))
+            pset_display_var.set(self.current_pset if self.current_pset else "---")
+            conn_display_var.set("CONNECTED" if self.session_active else "DISCONNECTED")
             current_target_batch = self.pset_parameters.get(self.current_pset, {}).get("batch_size", self.target_batch_size)
             with self.state_lock:
                 current_batch = self.batch_counter
-            batch_display_var.set(f"Batch: {current_batch}/{current_target_batch}")
+            batch_display_var.set(f"{current_batch}/{current_target_batch}")
+            vin_display_var.set(self.current_vin)
+            tool_protocol_status_var.set("ENABLED" if self.tool_enabled else "DISABLED")
 
-            vin_display_var.set(f"VIN: {self.current_vin}")
-            tool_protocol_status_var.set("Tool Status: " + ("Enabled" if self.tool_enabled else "Disabled"))
-            try: root.after(1000, update_labels)
-            except tk.TclError: pass
+            conn_label.configure(style="StatusOK.TLabel" if self.session_active else "StatusError.TLabel")
+            tool_label.configure(style="StatusOK.TLabel" if self.tool_enabled else "StatusWarn.TLabel")
+
+            result_status = last_result_status_var.get()
+            if result_status == "OK":
+                result_status_label.configure(style="StatusOK.TLabel")
+            elif result_status == "NOK":
+                result_status_label.configure(style="StatusError.TLabel")
+            else:
+                result_status_label.configure(style="StatusValue.TLabel")
+
+            try:
+                root.after(500, update_labels)
+            except tk.TclError:
+                pass
+
+        def clear_log():
+            log_text.configure(state='normal')
+            log_text.delete(1.0, tk.END)
+            log_text.configure(state='disabled')
+
+        def save_log():
+            filepath = filedialog.asksaveasfilename(
+                defaultextension=".log",
+                filetypes=[("Log files", "*.log"), ("Text files", "*.txt"), ("All files", "*.*")],
+                title="Save Communication Log"
+            )
+            if filepath:
+                try:
+                    with open(filepath, 'w') as f:
+                        f.write(log_text.get(1.0, tk.END))
+                    messagebox.showinfo("Success", f"Log saved to {filepath}")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to save log: {e}")
+
+        def toggle_file_logging():
+            if log_to_file_var.get():
+                filepath = filedialog.asksaveasfilename(
+                    defaultextension=".log",
+                    filetypes=[("Log files", "*.log"), ("Text files", "*.txt")],
+                    title="Select Live Log File"
+                )
+                if filepath:
+                    try:
+                        log_file_handle[0] = open(filepath, 'a')
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Failed to open log file: {e}")
+                        log_to_file_var.set(False)
+                else:
+                    log_to_file_var.set(False)
+            else:
+                if log_file_handle[0]:
+                    log_file_handle[0].close()
+                    log_file_handle[0] = None
 
         def apply_revision_settings():
             try:
@@ -1571,10 +1906,7 @@ class OpenProtocolEmulator:
 
         def refresh_profile_dropdown():
             """Refresh the profile dropdown with current available profiles."""
-            menu = profile_menu["menu"]
-            menu.delete(0, "end")
-            for profile in self.get_available_profiles():
-                menu.add_command(label=profile, command=lambda p=profile: profile_var.set(p))
+            profile_menu['values'] = self.get_available_profiles()
 
         def save_profile_dialog():
             """Open dialog to save current settings as a new profile."""
@@ -1657,7 +1989,6 @@ class OpenProtocolEmulator:
                     rev_mid_0061_var.set(str(self.revision_config.get(61, 7)))
                     rev_mid_0101_var.set(str(self.revision_config.get(101, 5)))
                     rev_mid_0215_var.set(str(self.revision_config.get(215, 2)))
-                    print(f"[GUI] Loaded profile '{loaded_name}' from: {filepath}")
                     messagebox.showinfo("Success", f"Profile '{loaded_name}' loaded")
                 except FileNotFoundError:
                     messagebox.showerror("Error", f"File not found: {filepath}")
@@ -1665,120 +1996,232 @@ class OpenProtocolEmulator:
                     messagebox.showerror("Error", f"Invalid profile file: {e}")
                 except Exception as e:
                     messagebox.showerror("Error", f"Failed to load profile: {e}")
-        # --- End GUI Callbacks ---
 
-        # --- GUI Layout ---
-        settings_frame = tk.LabelFrame(root, text="Global Settings", padx=5, pady=5)
-        settings_frame.pack(padx=10, pady=5, fill=tk.X)
-        tk.Label(settings_frame, text="Initial VIN:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
-        tk.Entry(settings_frame, textvariable=vin_var, width=20).grid(row=0, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Label(settings_frame, text="Global Batch Size:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2) # Renamed label
-        tk.Entry(settings_frame, textvariable=batch_size_var, width=5).grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Label(settings_frame, text="NOK %:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
-        tk.Entry(settings_frame, textvariable=nok_prob_var, width=5).grid(row=2, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Label(settings_frame, text="Auto Loop Interval (s):").grid(row=3, column=0, sticky=tk.W, padx=2, pady=2)
-        tk.Entry(settings_frame, textvariable=auto_loop_interval_var, width=5).grid(row=3, column=1, sticky=tk.W, pady=2)
-        tk.Button(settings_frame, text="Apply Global Settings", command=apply_global_settings).grid(row=0, column=2, rowspan=4, padx=10, pady=2, sticky=tk.NS) # Renamed button and command
+        main_container = ttk.Frame(root)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
 
-        # --- Pset Settings Frame ---
-        pset_settings_frame = tk.LabelFrame(root, text="Pset Settings", padx=5, pady=5)
-        pset_settings_frame.pack(padx=10, pady=5, fill=tk.X)
+        top_section = ttk.Frame(main_container)
+        top_section.pack(fill=tk.BOTH, expand=True)
 
-        tk.Label(pset_settings_frame, text="Pset ID:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
-        # Using OptionMenu for Pset selection
-        pset_id_optionmenu = tk.OptionMenu(pset_settings_frame, pset_id_var, *sorted(list(self.available_psets)))
-        pset_id_optionmenu.grid(row=0, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Button(pset_settings_frame, text="Load Pset Settings", command=load_pset_settings).grid(row=0, column=2, padx=10, pady=2)
+        notebook = ttk.Notebook(top_section)
+        notebook.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
 
+        global_tab = ttk.Frame(notebook, padding=12)
+        notebook.add(global_tab, text="  GLOBAL  ")
 
-        tk.Label(pset_settings_frame, text="Batch Size:").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
-        tk.Entry(pset_settings_frame, textvariable=pset_batch_size_var, width=5).grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
+        ttk.Label(global_tab, text="SIMULATION PARAMETERS", font=("Consolas", 11, "bold")).grid(
+            row=0, column=0, columnspan=4, sticky=tk.W, pady=(0, 12))
 
-        tk.Label(pset_settings_frame, text="Target Torque:").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
-        tk.Entry(pset_settings_frame, textvariable=pset_target_torque_var, width=8).grid(row=2, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Label(pset_settings_frame, text="Min Torque:").grid(row=2, column=2, sticky=tk.W, padx=2, pady=2)
-        tk.Entry(pset_settings_frame, textvariable=pset_torque_min_var, width=8).grid(row=2, column=3, sticky=tk.W, padx=2, pady=2)
-        tk.Label(pset_settings_frame, text="Max Torque:").grid(row=2, column=4, sticky=tk.W, padx=2, pady=2)
-        tk.Entry(pset_settings_frame, textvariable=pset_torque_max_var, width=8).grid(row=2, column=5, sticky=tk.W, padx=2, pady=2)
+        ttk.Label(global_tab, text="Initial VIN:").grid(row=1, column=0, sticky=tk.W, pady=6)
+        ttk.Entry(global_tab, textvariable=vin_var, width=24).grid(row=1, column=1, columnspan=2, sticky=tk.W, padx=(8, 0))
 
-        tk.Label(pset_settings_frame, text="Target Angle:").grid(row=3, column=0, sticky=tk.W, padx=2, pady=2)
-        tk.Entry(pset_settings_frame, textvariable=pset_target_angle_var, width=5).grid(row=3, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Label(pset_settings_frame, text="Min Angle:").grid(row=3, column=2, sticky=tk.W, padx=2, pady=2)
-        tk.Entry(pset_settings_frame, textvariable=pset_angle_min_var, width=5).grid(row=3, column=3, sticky=tk.W, padx=2, pady=2)
-        tk.Label(pset_settings_frame, text="Max Angle:").grid(row=3, column=4, sticky=tk.W, padx=2, pady=2)
-        tk.Entry(pset_settings_frame, textvariable=pset_angle_max_var, width=5).grid(row=3, column=5, sticky=tk.W, padx=2, pady=2)
+        ttk.Label(global_tab, text="Global Batch Size:").grid(row=2, column=0, sticky=tk.W, pady=6)
+        ttk.Entry(global_tab, textvariable=batch_size_var, width=8).grid(row=2, column=1, sticky=tk.W, padx=(8, 0))
 
-        tk.Button(pset_settings_frame, text="Apply Pset Settings", command=apply_pset_settings).grid(row=1, column=6, rowspan=3, padx=10, pady=2, sticky=tk.NS) # Adjusted rowspan and column
+        ttk.Label(global_tab, text="NOK Probability %:").grid(row=3, column=0, sticky=tk.W, pady=6)
+        ttk.Entry(global_tab, textvariable=nok_prob_var, width=8).grid(row=3, column=1, sticky=tk.W, padx=(8, 0))
 
-        # --- End Pset Settings Frame ---
+        ttk.Label(global_tab, text="Auto Loop Interval (s):").grid(row=4, column=0, sticky=tk.W, pady=6)
+        ttk.Entry(global_tab, textvariable=auto_loop_interval_var, width=8).grid(row=4, column=1, sticky=tk.W, padx=(8, 0))
 
-        # --- Revision Configuration Frame ---
-        revision_frame = tk.LabelFrame(root, text="Revision Configuration", padx=5, pady=5)
-        revision_frame.pack(padx=10, pady=5, fill=tk.X)
+        ttk.Button(global_tab, text="Apply Settings", command=apply_global_settings, style="Primary.TButton").grid(
+            row=5, column=0, columnspan=2, pady=(16, 8), sticky=tk.W)
 
-        # Row 0: Profile selection
-        tk.Label(revision_frame, text="Profile:").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
-        profile_menu = tk.OptionMenu(revision_frame, profile_var, *self.get_available_profiles())
-        profile_menu.config(width=12)
-        profile_menu.grid(row=0, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Button(revision_frame, text="Apply Profile", command=apply_profile_selection).grid(row=0, column=2, padx=2, pady=2)
-        tk.Button(revision_frame, text="Save...", command=save_profile_dialog).grid(row=0, column=3, padx=2, pady=2)
-        tk.Button(revision_frame, text="Load...", command=load_profile_from_file).grid(row=0, column=4, padx=2, pady=2)
+        ttk.Separator(global_tab, orient=tk.HORIZONTAL).grid(row=6, column=0, columnspan=4, sticky=tk.EW, pady=16)
 
-        # Row 1: MID 0002 and MID 0004
-        tk.Label(revision_frame, text="MID 0002 (Comm Start):").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
-        tk.Spinbox(revision_frame, from_=1, to=6, textvariable=rev_mid_0002_var, width=3).grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Label(revision_frame, text="MID 0004 (Error):").grid(row=1, column=2, sticky=tk.W, padx=2, pady=2)
-        tk.Spinbox(revision_frame, from_=1, to=3, textvariable=rev_mid_0004_var, width=3).grid(row=1, column=3, sticky=tk.W, padx=2, pady=2)
+        ttk.Label(global_tab, text="CONTROLS", font=("Consolas", 11, "bold")).grid(
+            row=7, column=0, columnspan=4, sticky=tk.W, pady=(0, 12))
 
-        # Row 2: MID 0015 and MID 0041
-        tk.Label(revision_frame, text="MID 0015 (Pset):").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
-        tk.Spinbox(revision_frame, from_=1, to=2, textvariable=rev_mid_0015_var, width=3).grid(row=2, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Label(revision_frame, text="MID 0041 (Tool Data):").grid(row=2, column=2, sticky=tk.W, padx=2, pady=2)
-        tk.Spinbox(revision_frame, from_=1, to=5, textvariable=rev_mid_0041_var, width=3).grid(row=2, column=3, sticky=tk.W, padx=2, pady=2)
+        control_frame = ttk.Frame(global_tab)
+        control_frame.grid(row=8, column=0, columnspan=4, sticky=tk.W)
 
-        # Row 3: MID 0052 and MID 0061
-        tk.Label(revision_frame, text="MID 0052 (VIN):").grid(row=3, column=0, sticky=tk.W, padx=2, pady=2)
-        tk.Spinbox(revision_frame, from_=1, to=2, textvariable=rev_mid_0052_var, width=3).grid(row=3, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Label(revision_frame, text="MID 0061 (Result):").grid(row=3, column=2, sticky=tk.W, padx=2, pady=2)
-        tk.Spinbox(revision_frame, from_=1, to=7, textvariable=rev_mid_0061_var, width=3).grid(row=3, column=3, sticky=tk.W, padx=2, pady=2)
+        ttk.Button(control_frame, text="Toggle Auto Loop", command=toggle_auto_send_loop, style="Control.TButton").pack(
+            side=tk.LEFT, padx=(0, 8))
+        auto_status_label = ttk.Label(control_frame, textvariable=auto_send_loop_status_var, style="StatusValue.TLabel", width=10, anchor="center")
+        auto_status_label.pack(side=tk.LEFT, padx=(0, 16))
+        ttk.Button(control_frame, text="Send Single Result", command=manual_send_result, style="Control.TButton").pack(
+            side=tk.LEFT)
 
-        # Row 4: MID 0101 and MID 0215
-        tk.Label(revision_frame, text="MID 0101 (Multi-Spindle):").grid(row=4, column=0, sticky=tk.W, padx=2, pady=2)
-        tk.Spinbox(revision_frame, from_=1, to=5, textvariable=rev_mid_0101_var, width=3).grid(row=4, column=1, sticky=tk.W, padx=2, pady=2)
-        tk.Label(revision_frame, text="MID 0215 (I/O Status):").grid(row=4, column=2, sticky=tk.W, padx=2, pady=2)
-        tk.Spinbox(revision_frame, from_=1, to=2, textvariable=rev_mid_0215_var, width=3).grid(row=4, column=3, sticky=tk.W, padx=2, pady=2)
+        pset_tab = ttk.Frame(notebook, padding=12)
+        notebook.add(pset_tab, text="  PSET CONFIG  ")
 
-        # Apply revisions button (spans rows 1-4)
-        tk.Button(revision_frame, text="Apply Revisions", command=apply_revision_settings).grid(row=1, column=4, rowspan=4, padx=10, pady=2, sticky=tk.NS)
-        # --- End Revision Configuration Frame ---
+        ttk.Label(pset_tab, text="PARAMETER SET CONFIGURATION", font=("Consolas", 11, "bold")).grid(
+            row=0, column=0, columnspan=6, sticky=tk.W, pady=(0, 12))
 
-        control_frame = tk.LabelFrame(root, text="Controls", padx=5, pady=5)
-        control_frame.pack(padx=10, pady=5, fill=tk.X)
-        toggle_loop_btn = tk.Button(control_frame, text="Toggle Auto Loop", command=toggle_auto_send_loop)
-        toggle_loop_btn.pack(side=tk.LEFT, padx=5)
-        auto_send_label = tk.Label(control_frame, textvariable=auto_send_loop_status_var, relief=tk.SUNKEN, width=10)
-        auto_send_label.pack(side=tk.LEFT, padx=5)
-        tk.Button(control_frame, text="Send Single Result", command=manual_send_result).pack(side=tk.LEFT, padx=10)
+        ttk.Label(pset_tab, text="Pset ID:").grid(row=1, column=0, sticky=tk.W, pady=6)
+        pset_combo = ttk.Combobox(pset_tab, textvariable=pset_id_var, values=sorted(list(self.available_psets)), width=10, state="readonly")
+        pset_combo.grid(row=1, column=1, sticky=tk.W, padx=(8, 0))
+        ttk.Button(pset_tab, text="Load", command=load_pset_settings, style="Control.TButton").grid(
+            row=1, column=2, padx=(16, 0))
 
-        status_frame = tk.LabelFrame(root, text="Status", padx=5, pady=5)
-        status_frame.pack(padx=10, pady=10, fill=tk.X)
-        tk.Label(status_frame, textvariable=conn_display_var).pack(anchor=tk.W)
-        tk.Label(status_frame, textvariable=tool_protocol_status_var).pack(anchor=tk.W)
-        tk.Label(status_frame, textvariable=pset_display_var).pack(anchor=tk.W)
-        tk.Label(status_frame, textvariable=vin_display_var).pack(anchor=tk.W)
-        tk.Label(status_frame, textvariable=batch_display_var).pack(anchor=tk.W)
-        # --- End GUI Layout ---
+        ttk.Separator(pset_tab, orient=tk.HORIZONTAL).grid(row=2, column=0, columnspan=6, sticky=tk.EW, pady=16)
 
-        # Bind the save function to the window closing event
-        root.protocol("WM_DELETE_WINDOW", lambda: (self._save_pset_parameters(self.controller_name), root.destroy()))
+        ttk.Label(pset_tab, text="Batch Size:").grid(row=3, column=0, sticky=tk.W, pady=6)
+        ttk.Entry(pset_tab, textvariable=pset_batch_size_var, width=8).grid(row=3, column=1, sticky=tk.W, padx=(8, 0))
 
-        # Bind load_pset_settings to the Pset ID variable trace
+        ttk.Label(pset_tab, text="TORQUE LIMITS", font=("Consolas", 10, "bold")).grid(
+            row=4, column=0, columnspan=6, sticky=tk.W, pady=(16, 8))
+
+        torque_frame = ttk.Frame(pset_tab)
+        torque_frame.grid(row=5, column=0, columnspan=6, sticky=tk.W)
+        ttk.Label(torque_frame, text="Target:").pack(side=tk.LEFT)
+        ttk.Entry(torque_frame, textvariable=pset_target_torque_var, width=8).pack(side=tk.LEFT, padx=(4, 16))
+        ttk.Label(torque_frame, text="Min:").pack(side=tk.LEFT)
+        ttk.Entry(torque_frame, textvariable=pset_torque_min_var, width=8).pack(side=tk.LEFT, padx=(4, 16))
+        ttk.Label(torque_frame, text="Max:").pack(side=tk.LEFT)
+        ttk.Entry(torque_frame, textvariable=pset_torque_max_var, width=8).pack(side=tk.LEFT, padx=(4, 0))
+
+        ttk.Label(pset_tab, text="ANGLE LIMITS", font=("Consolas", 10, "bold")).grid(
+            row=6, column=0, columnspan=6, sticky=tk.W, pady=(16, 8))
+
+        angle_frame = ttk.Frame(pset_tab)
+        angle_frame.grid(row=7, column=0, columnspan=6, sticky=tk.W)
+        ttk.Label(angle_frame, text="Target:").pack(side=tk.LEFT)
+        ttk.Entry(angle_frame, textvariable=pset_target_angle_var, width=8).pack(side=tk.LEFT, padx=(4, 16))
+        ttk.Label(angle_frame, text="Min:").pack(side=tk.LEFT)
+        ttk.Entry(angle_frame, textvariable=pset_angle_min_var, width=8).pack(side=tk.LEFT, padx=(4, 16))
+        ttk.Label(angle_frame, text="Max:").pack(side=tk.LEFT)
+        ttk.Entry(angle_frame, textvariable=pset_angle_max_var, width=8).pack(side=tk.LEFT, padx=(4, 0))
+
+        ttk.Button(pset_tab, text="Apply Pset Settings", command=apply_pset_settings, style="Primary.TButton").grid(
+            row=8, column=0, columnspan=3, pady=(20, 8), sticky=tk.W)
+
+        revision_tab = ttk.Frame(notebook, padding=12)
+        notebook.add(revision_tab, text="  REVISIONS  ")
+
+        ttk.Label(revision_tab, text="MID REVISION CONFIGURATION", font=("Consolas", 11, "bold")).grid(
+            row=0, column=0, columnspan=6, sticky=tk.W, pady=(0, 12))
+
+        profile_frame = ttk.Frame(revision_tab)
+        profile_frame.grid(row=1, column=0, columnspan=6, sticky=tk.W, pady=(0, 16))
+        ttk.Label(profile_frame, text="Profile:").pack(side=tk.LEFT)
+        profile_combo = ttk.Combobox(profile_frame, textvariable=profile_var, values=self.get_available_profiles(), width=16, state="readonly")
+        profile_combo.pack(side=tk.LEFT, padx=(8, 12))
+        profile_menu = profile_combo
+        ttk.Button(profile_frame, text="Apply", command=apply_profile_selection, style="Control.TButton").pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(profile_frame, text="Save...", command=save_profile_dialog, style="Control.TButton").pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(profile_frame, text="Load...", command=load_profile_from_file, style="Control.TButton").pack(side=tk.LEFT)
+
+        ttk.Separator(revision_tab, orient=tk.HORIZONTAL).grid(row=2, column=0, columnspan=6, sticky=tk.EW, pady=8)
+
+        mid_configs = [
+            ("MID 0002", "Comm Start", rev_mid_0002_var, 1, 6),
+            ("MID 0004", "Error", rev_mid_0004_var, 1, 3),
+            ("MID 0015", "Pset", rev_mid_0015_var, 1, 2),
+            ("MID 0041", "Tool Data", rev_mid_0041_var, 1, 5),
+            ("MID 0052", "VIN", rev_mid_0052_var, 1, 2),
+            ("MID 0061", "Result", rev_mid_0061_var, 1, 7),
+            ("MID 0101", "Multi-Spindle", rev_mid_0101_var, 1, 5),
+            ("MID 0215", "I/O Status", rev_mid_0215_var, 1, 2),
+        ]
+
+        for idx, (mid, desc, var, min_val, max_val) in enumerate(mid_configs):
+            row = 3 + (idx // 2)
+            col = (idx % 2) * 3
+            ttk.Label(revision_tab, text=f"{mid} ({desc}):").grid(row=row, column=col, sticky=tk.W, pady=4, padx=(0, 4))
+            ttk.Spinbox(revision_tab, from_=min_val, to=max_val, textvariable=var, width=4).grid(
+                row=row, column=col+1, sticky=tk.W, padx=(0, 24))
+
+        ttk.Button(revision_tab, text="Apply Revisions", command=apply_revision_settings, style="Primary.TButton").grid(
+            row=8, column=0, columnspan=3, pady=(16, 8), sticky=tk.W)
+
+        status_frame = ttk.LabelFrame(top_section, text="STATUS", padding=12)
+        status_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 0))
+
+        status_items = [
+            ("Connection:", conn_display_var, "conn"),
+            ("Tool:", tool_protocol_status_var, "tool"),
+            ("Pset:", pset_display_var, "pset"),
+            ("VIN:", vin_display_var, "vin"),
+            ("Batch:", batch_display_var, "batch"),
+            ("Auto Loop:", auto_send_loop_status_var, "loop"),
+        ]
+
+        conn_label = None
+        tool_label = None
+        result_status_label = None
+
+        for idx, (label_text, var, key) in enumerate(status_items):
+            ttk.Label(status_frame, text=label_text, style="Status.TLabel").grid(row=idx, column=0, sticky=tk.W, pady=4)
+            lbl = ttk.Label(status_frame, textvariable=var, style="StatusValue.TLabel", width=14, anchor="e")
+            lbl.grid(row=idx, column=1, sticky=tk.E, pady=4, padx=(8, 0))
+            if key == "conn":
+                conn_label = lbl
+            elif key == "tool":
+                tool_label = lbl
+
+        ttk.Separator(status_frame, orient=tk.HORIZONTAL).grid(row=6, column=0, columnspan=2, sticky=tk.EW, pady=12)
+
+        ttk.Label(status_frame, text="LAST RESULT", font=("Consolas", 9, "bold"), foreground="#00d9ff").grid(
+            row=7, column=0, columnspan=2, sticky=tk.W, pady=(0, 8))
+
+        result_items = [
+            ("Status:", last_result_status_var, "result_status"),
+            ("Torque:", last_result_torque_var, "torque"),
+            ("Angle:", last_result_angle_var, "angle"),
+            ("ID:", last_result_id_var, "id"),
+        ]
+
+        for idx, (label_text, var, key) in enumerate(result_items):
+            ttk.Label(status_frame, text=label_text, style="Status.TLabel").grid(row=8+idx, column=0, sticky=tk.W, pady=2)
+            lbl = ttk.Label(status_frame, textvariable=var, style="StatusValue.TLabel", width=14, anchor="e")
+            lbl.grid(row=8+idx, column=1, sticky=tk.E, pady=2, padx=(8, 0))
+            if key == "result_status":
+                result_status_label = lbl
+
+        log_frame = ttk.LabelFrame(main_container, text="COMMUNICATION LOG", padding=8)
+        log_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+
+        log_controls = ttk.Frame(log_frame)
+        log_controls.pack(fill=tk.X, pady=(0, 8))
+
+        ttk.Button(log_controls, text="Clear", command=clear_log, style="Control.TButton").pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(log_controls, text="Save Log...", command=save_log, style="Control.TButton").pack(side=tk.LEFT, padx=(0, 16))
+        ttk.Checkbutton(log_controls, text="Live Log to File", variable=log_to_file_var, command=toggle_file_logging).pack(side=tk.LEFT, padx=(0, 16))
+        ttk.Checkbutton(log_controls, text="Hide Keep-Alive (9999)", variable=hide_keepalive_var).pack(side=tk.LEFT)
+
+        log_container = ttk.Frame(log_frame)
+        log_container.pack(fill=tk.BOTH, expand=True)
+
+        log_text = tk.Text(
+            log_container,
+            height=10,
+            wrap=tk.NONE,
+            font=("Consolas", 9),
+            bg="#0d1117",
+            fg="#8b949e",
+            insertbackground="#00d9ff",
+            selectbackground="#1a4a7a",
+            selectforeground="#e8e8e8",
+            relief="flat",
+            borderwidth=0,
+            padx=8,
+            pady=8
+        )
+        log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        log_scrollbar_y = ttk.Scrollbar(log_container, orient=tk.VERTICAL, command=log_text.yview)
+        log_scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        log_text.configure(yscrollcommand=log_scrollbar_y.set)
+
+        log_scrollbar_x = ttk.Scrollbar(log_frame, orient=tk.HORIZONTAL, command=log_text.xview)
+        log_scrollbar_x.pack(fill=tk.X)
+        log_text.configure(xscrollcommand=log_scrollbar_x.set)
+
+        log_text.tag_configure("send", foreground="#00d9ff")
+        log_text.tag_configure("recv", foreground="#00ff88")
+        log_text.tag_configure("info", foreground="#ffaa00")
+        log_text.configure(state='disabled')
+
+        def on_closing():
+            if log_file_handle[0]:
+                log_file_handle[0].close()
+            self._save_pset_parameters(self.controller_name)
+            root.destroy()
+
+        root.protocol("WM_DELETE_WINDOW", on_closing)
         pset_id_var.trace_add("write", lambda name, index, mode: load_pset_settings())
-
-        # Load initial Pset settings into GUI fields
         load_pset_settings()
-
         update_labels()
         root.mainloop()
 

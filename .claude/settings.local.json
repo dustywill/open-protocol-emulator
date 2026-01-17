@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem \"C:/Users/byron/Downloads/OP/\" -Filter \"*.pdf\")",
+      "Bash(Select-Object Name, Length)",
+      "Read(//c/Users/byron/Downloads/OP/**)",
+      "Bash(timeout 3 python:*)",
+      "Bash(python:*)"
+    ]
+  }
+}
