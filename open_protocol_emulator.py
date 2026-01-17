@@ -1361,6 +1361,15 @@ class OpenProtocolEmulator:
         tool_protocol_status_var = tk.StringVar(value="Tool Status: Enabled")
         # --- End GUI Variables ---
 
+        # --- Revision Configuration GUI Variables ---
+        rev_mid_0002_var = tk.StringVar(value=str(self.revision_config.get(2, 6)))
+        rev_mid_0004_var = tk.StringVar(value=str(self.revision_config.get(4, 3)))
+        rev_mid_0015_var = tk.StringVar(value=str(self.revision_config.get(15, 2)))
+        rev_mid_0041_var = tk.StringVar(value=str(self.revision_config.get(41, 5)))
+        rev_mid_0052_var = tk.StringVar(value=str(self.revision_config.get(52, 2)))
+        rev_mid_0061_var = tk.StringVar(value=str(self.revision_config.get(61, 7)))
+        # --- End Revision Configuration GUI Variables ---
+
         # --- Pset GUI Variables ---
         pset_id_var = tk.StringVar(value=list(self.available_psets)[0] if self.available_psets else "")
         pset_batch_size_var = tk.StringVar(value="")
