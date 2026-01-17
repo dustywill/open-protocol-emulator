@@ -491,6 +491,37 @@ class OpenProtocolEmulator:
             print(f"[Time] Invalid time length received: {len(time_str)} chars (expected 19)")
         self.send_to_client(resp)
 
+    # === Multi-spindle MID Handlers ===
+
+    def _handle_mid_0100(self, mid_int: int, rev: str, no_ack_flag: str, data_field: str, msg: bytes):
+        """MID 0100: Multi-spindle result subscribe (Rev 1-5)."""
+        req_rev = int(rev.strip()) if rev.strip() else 1
+
+        if req_rev > self.MAX_REV_0101:
+            error_data = self._build_mid0004_data(1, 100, 97)
+            resp = build_message(4, rev=1, data=error_data)
+            print(f"[MultiSpindle] Revision {req_rev} not supported (max: {self.MAX_REV_0101}).")
+        elif self.multi_spindle_subscribed:
+            error_data = self._build_mid0004_data(1, 100, 9)
+            resp = build_message(4, rev=1, data=error_data)
+            print("[MultiSpindle] Subscribe failed: already subscribed.")
+        else:
+            self.multi_spindle_subscribed = True
+            self.multi_spindle_no_ack = (no_ack_flag == "1")
+            self.multi_spindle_requested_rev = req_rev
+
+            if req_rev >= 2 and len(data_field) >= 10:
+                rewind_point = data_field[:10]
+                print(f"[MultiSpindle] Rewind point requested: {rewind_point} (ignored, emulator sends new only)")
+            if req_rev >= 3 and len(data_field) >= 11:
+                send_only_new = data_field[10:11]
+                print(f"[MultiSpindle] Send only new flag: {send_only_new}")
+
+            resp = build_message(5, rev=1, data="0100")
+            print(f"[MultiSpindle] Subscription accepted (revision {req_rev}).")
+
+        self.send_to_client(resp)
+
     def _initialize_default_pset_parameters(self):
         """Initializes default parameters for available Psets."""
         default_params = {
