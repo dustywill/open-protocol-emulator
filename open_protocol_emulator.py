@@ -635,6 +635,72 @@ class OpenProtocolEmulator:
 
         self.send_to_client(resp)
 
+    def _handle_mid_0216(self, mid_int: int, rev: str, no_ack_flag: str, data_field: str, msg: bytes):
+        """MID 0216: Relay function subscribe."""
+        relay_func = data_field[:3] if len(data_field) >= 3 else "000"
+
+        try:
+            relay_num = int(relay_func)
+        except ValueError:
+            error_data = self._build_mid0004_data(1, 216, 99)
+            resp = build_message(4, rev=1, data=error_data)
+            self.send_to_client(resp)
+            return
+
+        if relay_num in self.relay_subscriptions:
+            error_data = self._build_mid0004_data(1, 216, 6)
+            resp = build_message(4, rev=1, data=error_data)
+            print(f"[Relay] Subscription for relay function {relay_num} already exists.")
+        else:
+            self.relay_subscriptions[relay_num] = (no_ack_flag == "1")
+            resp = build_message(5, rev=1, data="0216")
+            print(f"[Relay] Subscribed to relay function {relay_num}.")
+
+            self.send_to_client(resp)
+            self._send_relay_status(relay_num)
+            return
+
+        self.send_to_client(resp)
+
+    def _handle_mid_0219(self, mid_int: int, rev: str, no_ack_flag: str, data_field: str, msg: bytes):
+        """MID 0219: Relay function unsubscribe."""
+        relay_func = data_field[:3] if len(data_field) >= 3 else "000"
+
+        try:
+            relay_num = int(relay_func)
+        except ValueError:
+            error_data = self._build_mid0004_data(1, 219, 99)
+            resp = build_message(4, rev=1, data=error_data)
+            self.send_to_client(resp)
+            return
+
+        if relay_num in self.relay_subscriptions:
+            del self.relay_subscriptions[relay_num]
+            resp = build_message(5, rev=1, data="0219")
+            print(f"[Relay] Unsubscribed from relay function {relay_num}.")
+        else:
+            error_data = self._build_mid0004_data(1, 219, 7)
+            resp = build_message(4, rev=1, data=error_data)
+            print(f"[Relay] Unsubscribe failed: not subscribed to relay {relay_num}.")
+
+        self.send_to_client(resp)
+
+    def _send_relay_status(self, relay_func: int):
+        """Send MID 0217 relay function status for a subscribed relay."""
+        status = 0
+        for device in self.io_devices.values():
+            for relay in device["relays"]:
+                if relay["function"] == relay_func:
+                    status = relay["status"]
+                    break
+
+        no_ack = self.relay_subscriptions.get(relay_func, False)
+
+        data = f"01{relay_func:03d}02{status}"
+        msg = build_message(217, rev=1, data=data, no_ack=no_ack)
+        self.send_to_client(msg)
+        print(f"[Relay] Sent relay {relay_func} status: {status} (MID 0217)")
+
     def _initialize_default_pset_parameters(self):
         """Initializes default parameters for available Psets."""
         default_params = {
@@ -924,6 +990,7 @@ class OpenProtocolEmulator:
         self.pset_subscribed_rev = 1
         self.vin_subscribed_rev = 1
         self.result_subscribed_rev = 1
+        self.relay_subscriptions = {}
         try: sock.close()
         except OSError: pass
         self.client_socket = None
