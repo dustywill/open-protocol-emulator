@@ -1,120 +1,166 @@
-# Open Protocol (Contoller) Emulator
+# Open Protocol Controller Emulator
 
-This project provides a Python-based emulator for an Open Protocol controller, such as an Atlas Copco or Panasonic torque tool. It's designed for testing and development purposes, allowing you to simulate communication with a controller without needing physical hardware. This can be particularly useful for integrating with systems like Node-RED.
+A Python-based emulator for Open Protocol controllers (Atlas Copco, Panasonic, etc.). Designed for testing and development, allowing you to simulate controller communication without physical hardware.
 
-## Features
-
-- **Open Protocol Communication:** Emulates key Open Protocol MIDs for communication with a client.
-- **Tightening Result Simulation:** Simulates tightening results (MID 0061) with configurable parameters for torque, angle, and OK/NOK status.
-- **VIN and Batch Handling:** Supports setting and incrementing VINs and managing batch counts.
-- **Pset Management:** Allows selecting and configuring Parameter Sets (Psets) with specific tightening parameters.
-- **Tool Control:** Emulates tool enable/disable commands (MID 0042/0043).
-- **Graphical User Interface (GUI):** Provides a simple Tkinter GUI for controlling emulator settings and monitoring status.
-
-## Implemented MIDs
-
-- MID 0001: Communication start
-- MID 0002: Communication start acknowledge
-- MID 0003: Communication stop
-- MID 0004: Command error
-- MID 0005: Command accepted
-- MID 0014: Parameter set selected subscribe
-- MID 0015: Parameter set selected
-- MID 0016: Parameter set selected acknowledge
-- MID 0018: Select Parameter set
-- MID 0042: Request tool disable
-- MID 0043: Request tool enable
-- MID 0050: VIN download request
-- MID 0051: VIN subscribe
-- MID 0052: VIN
-- MID 0053: VIN acknowledge
-- MID 0054: VIN unsubscribe
-- MID 0060: Last tightening result data subscribe
-- MID 0061: Last tightening result data
-- MID 0062: Last tightening result acknowledge
-- MID 0063: Last tightening result unsubscribe
-- MID 9999: Keep alive
-
-## GUI Features
-
-The Python script includes a graphical user interface with the following controls:
-
-- **Global Settings:**
-    - Set the initial VIN.
-    - Configure the global batch size (used as a fallback if no Pset is selected).
-    - Set the percentage of NOK (Not OK) results for simulation.
-    - Adjust the interval time between automatic tightening results.
-- **Pset Settings:**
-    - Select an available Pset ID.
-    - Load and apply specific tightening parameters (batch size, target torque, torque min/max, target angle, angle min/max) for the selected Pset.
-    - Save Pset parameters to a JSON file.
-- **Controls:**
-    - Toggle the automatic sending of tightening results.
-    - Manually trigger a single tightening result.
-- **Status:**
-    - Display connection status.
-    - Show the current tool protocol status (Enabled/Disabled).
-    - Indicate the currently selected Pset.
-    - Display the current VIN.
-    - Show the current batch progress.
-
-## Getting Started
-
-### Prerequisites
+## Requirements
 
 - Python 3.x
+- customtkinter
 
-### Installation
+## Installation
 
-This project does not have external dependencies beyond the standard Python library.
+```bash
+pip install customtkinter
+```
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-username/open-protocol-emulator.git
-   cd open-protocol-emulator
-   ```
-
-### Running the Emulator
-
-You can run the emulator from your terminal:
+## Running the Emulator
 
 ```bash
 python open_protocol_emulator.py
 ```
 
-This will start the server on the default port (4545) and launch the GUI.
+This starts the server on port 4545 and launches the GUI.
 
-#### Command-line Arguments
+### Command-line Arguments
 
-You can customize the port and controller name using command-line arguments:
-
-- `-p`, `--port`: Port number to listen on (default: 4545)
-- `-n`, `--name`: Controller name reported in MID 0002 (default: OpenProtocolSim)
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `-p`, `--port` | Port number to listen on | 4545 |
+| `-n`, `--name` | Controller name (reported in MID 0002) | OpenProtocolSim |
 
 Example:
 ```bash
-python open_protocol_emulator.py --port 5000 --name MyEmulator
+python open_protocol_emulator.py --port 5000 --name MyController
 ```
 
-### Running with Docker
+## Features
 
-To run Node-RED with the `node-red-contrib-open-protocol` node pre-installed using Docker Compose:
+### Communication
+- Full Open Protocol message handling with configurable MID revisions
+- Keep-alive support (MID 9999)
+- Multi-revision support for most MIDs
 
-1.  Ensure you have Docker and Docker Compose installed.
-2.  Build the Docker image (this will install the Node-RED node):
-    ```bash
-    docker compose build
-    ```
-3.  Run the containers:
-    ```bash
-    docker compose up -d
-    ```
-    This will start the Node-RED container in detached mode. Node-RED will be accessible at `http://localhost:1880`. The emulator is expected to be running separately on the host machine, listening on port 4545 (or other configured ports).
+### Tightening Simulation
+- Single tightening results (MID 0061, revisions 1-7)
+- Multi-spindle results (MID 0101, revisions 1-5)
+- Configurable OK/NOK probability
+- Automatic or manual result triggering
+
+### Parameter Sets (PSets)
+- 24 configurable PSets (001-005, 010-015, 050-055, 100-105)
+- Per-PSet settings: batch size, torque limits, angle limits
+- PSet parameters saved to JSON file per controller name
+
+### I/O and Relays
+- Relay function subscription and status (MID 0216/0217/0219)
+- Configurable relay mappings (trigger, forward, reverse)
+- GUI toggle switches for relay control
+
+### Controller Profiles
+- Built-in profiles: legacy, pf6000-basic, pf6000-full
+- Save/load custom profiles with revision and relay configurations
+- Profiles stored in `controllers/` folder as JSON
+
+### VIN Management
+- VIN subscription and download (MID 0050/0051/0052)
+- Auto-incrementing VIN support
+
+### Tool Control
+- Tool enable/disable (MID 0042/0043)
+- Tool data reporting (MID 0041)
+
+## Implemented MIDs
+
+| MID | Description | Revisions |
+|-----|-------------|-----------|
+| 0001 | Communication start | 1 |
+| 0002 | Communication start acknowledge | 1-6 |
+| 0003 | Communication stop | 1 |
+| 0004 | Command error | 1-3 |
+| 0005 | Command accepted | 1 |
+| 0014 | Parameter set selected subscribe | 1 |
+| 0015 | Parameter set selected | 1-2 |
+| 0016 | Parameter set selected acknowledge | 1 |
+| 0017 | Parameter set selected unsubscribe | 1 |
+| 0018 | Select parameter set | 1 |
+| 0040 | Tool data request | 1 |
+| 0041 | Tool data reply | 1-5 |
+| 0042 | Disable tool | 1 |
+| 0043 | Enable tool | 1 |
+| 0050 | VIN download request | 1 |
+| 0051 | VIN subscribe | 1 |
+| 0052 | VIN number | 1-2 |
+| 0053 | VIN acknowledge | 1 |
+| 0054 | VIN unsubscribe | 1 |
+| 0060 | Tightening result subscribe | 1 |
+| 0061 | Tightening result | 1-7 |
+| 0062 | Tightening result acknowledge | 1 |
+| 0063 | Tightening result unsubscribe | 1 |
+| 0100 | Multi-spindle result subscribe | 1-5 |
+| 0101 | Multi-spindle result | 1-5 |
+| 0102 | Multi-spindle result acknowledge | 1 |
+| 0103 | Multi-spindle result unsubscribe | 1 |
+| 0214 | I/O device status request | 1-2 |
+| 0215 | I/O device status reply | 1-2 |
+| 0216 | Relay function subscribe | 1 |
+| 0217 | Relay function status | 1 |
+| 0218 | Relay function acknowledge | 1 |
+| 0219 | Relay function unsubscribe | 1 |
+| 9999 | Keep alive | 1 |
+
+## GUI Overview
+
+### GLOBAL Tab
+- **Simulation Parameters**: VIN, batch size, NOK probability, auto-loop interval
+- **Controls**: Toggle auto-loop, send single result
+- **I/O Relays**: Direction (forward/reverse) and trigger toggle switches
+
+### PSET CONFIG Tab
+- Select and configure parameter sets
+- Load/apply PSet settings
+- Parameters: batch size, target torque, torque min/max, target angle, angle min/max
+
+### REVISIONS Tab
+- Configure maximum supported revision for each MID
+- Load/save/apply controller profiles
+
+### Status Panel
+- Connection status
+- Tool enabled/disabled state
+- Current PSet and VIN
+- Batch progress
+- Auto-loop status
+- Last tightening result
+- Active subscriptions (VIN, PSet, Result, Multi-Spindle, Relays)
+
+### Log Panel
+- Real-time message logging
+- Incoming/outgoing message display
+- Optional file logging
+
+## Files
+
+| File | Description |
+|------|-------------|
+| `open_protocol_emulator.py` | Main application |
+| `pset_parameters_<name>.json` | PSet configurations (auto-created) |
+| `controllers/` | Custom controller profiles |
+
+## Docker (Node-RED)
+
+To run Node-RED with `node-red-contrib-open-protocol`:
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+Node-RED will be available at `http://localhost:1880`. Run the emulator separately on the host.
 
 ## Contributing
 
-Feel free to help out with the implementation of additional MIDs or other features.
+Contributions welcome for additional MIDs or features.
 
 ## License
 
-GPL-3.0 license
+GPL-3.0
