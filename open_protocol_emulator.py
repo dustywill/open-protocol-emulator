@@ -1500,6 +1500,21 @@ class OpenProtocolEmulator:
             tool_protocol_status_var.set("Tool Status: " + ("Enabled" if self.tool_enabled else "Disabled"))
             try: root.after(1000, update_labels)
             except tk.TclError: pass
+
+        def apply_revision_settings():
+            try:
+                self.set_max_revision(2, int(rev_mid_0002_var.get()))
+                self.set_max_revision(4, int(rev_mid_0004_var.get()))
+                self.set_max_revision(15, int(rev_mid_0015_var.get()))
+                self.set_max_revision(41, int(rev_mid_0041_var.get()))
+                self.set_max_revision(52, int(rev_mid_0052_var.get()))
+                self.set_max_revision(61, int(rev_mid_0061_var.get()))
+                self.current_profile = "custom"
+                print("[GUI] Applied revision configuration:")
+                for mid, rev in sorted(self.revision_config.items()):
+                    print(f"  MID {mid:04d}: rev {rev}")
+            except ValueError as e:
+                messagebox.showerror("Error", f"Invalid revision value: {e}")
         # --- End GUI Callbacks ---
 
         # --- GUI Layout ---
