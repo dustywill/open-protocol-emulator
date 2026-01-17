@@ -6,8 +6,12 @@ import datetime
 import random
 import tkinter as tk
 from tkinter import messagebox, filedialog
-import re # Import regex for VIN parsing
-import argparse # For command-line arguments
+import re
+import argparse
+import os
+import json
+
+CONTROLLERS_DIR = "controllers"
 
 # Helper: Build an Open Protocol message.
 def build_message(mid: int, rev: int = 1, data: str = "", no_ack: bool = False,
@@ -279,31 +283,48 @@ class OpenProtocolEmulator:
         return dict(self.revision_config)
 
     def apply_profile(self, profile_name: str) -> None:
-        """Apply a controller profile by name."""
-        if profile_name not in self.DEFAULT_PROFILES:
-            raise ValueError(f"Unknown profile: {profile_name}. Available: {list(self.DEFAULT_PROFILES.keys())}")
+        """Apply a controller profile by name (built-in or from controllers folder)."""
+        if profile_name in self.DEFAULT_PROFILES:
+            profile = self.DEFAULT_PROFILES[profile_name]
+            self.revision_config.update(profile["revisions"])
+            self.current_profile = profile_name
+            return
 
-        profile = self.DEFAULT_PROFILES[profile_name]
-        self.revision_config.update(profile["revisions"])
-        self.current_profile = profile_name
+        filepath = os.path.join(CONTROLLERS_DIR, f"{profile_name}.json")
+        if os.path.exists(filepath):
+            self.load_profile_from_file(filepath)
+            return
+
+        raise ValueError(f"Unknown profile: {profile_name}")
 
     def get_current_profile(self) -> str:
         """Get the name of the currently active profile."""
         return self.current_profile
 
     def get_available_profiles(self) -> list:
-        """Get list of available profile names."""
-        return list(self.DEFAULT_PROFILES.keys())
+        """Get list of available profile names (built-in + controllers folder)."""
+        profiles = list(self.DEFAULT_PROFILES.keys())
+        if os.path.exists(CONTROLLERS_DIR):
+            for filename in os.listdir(CONTROLLERS_DIR):
+                if filename.endswith('.json'):
+                    profile_name = filename[:-5]
+                    if profile_name not in profiles:
+                        profiles.append(profile_name)
+        return profiles
 
     def get_profile_description(self, profile_name: str) -> str:
         """Get the description of a profile."""
-        if profile_name not in self.DEFAULT_PROFILES:
-            return "Unknown profile"
-        return self.DEFAULT_PROFILES[profile_name]["description"]
+        if profile_name in self.DEFAULT_PROFILES:
+            return self.DEFAULT_PROFILES[profile_name]["description"]
+        filepath = os.path.join(CONTROLLERS_DIR, f"{profile_name}.json")
+        if os.path.exists(filepath):
+            with open(filepath, 'r') as f:
+                profile_data = json.load(f)
+            return profile_data.get("description", f"Custom profile: {profile_name}")
+        return "Unknown profile"
 
     def save_profile_to_file(self, filepath: str, profile_name: str) -> None:
         """Save current revision config as a named profile to JSON file."""
-        import json
         profile_data = {
             "name": profile_name,
             "description": f"Custom profile: {profile_name}",
@@ -312,10 +333,17 @@ class OpenProtocolEmulator:
         with open(filepath, 'w') as f:
             json.dump(profile_data, f, indent=2)
 
+    def save_profile_to_controllers(self, profile_name: str) -> str:
+        """Save current revision config to controllers folder. Returns filepath."""
+        if not os.path.exists(CONTROLLERS_DIR):
+            os.makedirs(CONTROLLERS_DIR)
+        filepath = os.path.join(CONTROLLERS_DIR, f"{profile_name}.json")
+        self.save_profile_to_file(filepath, profile_name)
+        self.current_profile = profile_name
+        return filepath
+
     def load_profile_from_file(self, filepath: str) -> str:
         """Load a profile from JSON file and apply it. Returns profile name."""
-        import json
-        import os
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"Profile file not found: {filepath}")
 
@@ -1541,22 +1569,76 @@ class OpenProtocolEmulator:
             except ValueError as e:
                 messagebox.showerror("Error", str(e))
 
-        def save_profile_to_file():
-            filepath = filedialog.asksaveasfilename(
-                defaultextension=".json",
-                filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-                title="Save Profile"
-            )
-            if filepath:
+        def refresh_profile_dropdown():
+            """Refresh the profile dropdown with current available profiles."""
+            menu = profile_menu["menu"]
+            menu.delete(0, "end")
+            for profile in self.get_available_profiles():
+                menu.add_command(label=profile, command=lambda p=profile: profile_var.set(p))
+
+        def save_profile_dialog():
+            """Open dialog to save current settings as a new profile."""
+            self.set_max_revision(2, int(rev_mid_0002_var.get()))
+            self.set_max_revision(4, int(rev_mid_0004_var.get()))
+            self.set_max_revision(15, int(rev_mid_0015_var.get()))
+            self.set_max_revision(41, int(rev_mid_0041_var.get()))
+            self.set_max_revision(52, int(rev_mid_0052_var.get()))
+            self.set_max_revision(61, int(rev_mid_0061_var.get()))
+            self.set_max_revision(101, int(rev_mid_0101_var.get()))
+            self.set_max_revision(215, int(rev_mid_0215_var.get()))
+
+            dialog = tk.Toplevel(root)
+            dialog.title("Save Profile")
+            dialog.geometry("350x150")
+            dialog.transient(root)
+            dialog.grab_set()
+
+            tk.Label(dialog, text="Profile Name:").grid(row=0, column=0, sticky=tk.W, padx=10, pady=10)
+            name_entry = tk.Entry(dialog, width=30)
+            name_entry.grid(row=0, column=1, padx=10, pady=10)
+            name_entry.insert(0, "my-controller")
+
+            tk.Label(dialog, text="Description:").grid(row=1, column=0, sticky=tk.W, padx=10, pady=5)
+            desc_entry = tk.Entry(dialog, width=30)
+            desc_entry.grid(row=1, column=1, padx=10, pady=5)
+            desc_entry.insert(0, "Custom controller profile")
+
+            def do_save():
+                profile_name = name_entry.get().strip()
+                description = desc_entry.get().strip()
+                if not profile_name:
+                    messagebox.showerror("Error", "Profile name is required")
+                    return
+                if profile_name in self.DEFAULT_PROFILES:
+                    messagebox.showerror("Error", f"Cannot overwrite built-in profile: {profile_name}")
+                    return
+                profile_name = profile_name.replace(" ", "-").lower()
                 try:
-                    profile_name = profile_var.get()
-                    if profile_name in self.DEFAULT_PROFILES:
-                        profile_name = "custom"
-                    self.save_profile_to_file(filepath, profile_name)
-                    print(f"[GUI] Saved profile to: {filepath}")
-                    messagebox.showinfo("Success", f"Profile saved to {filepath}")
+                    if not os.path.exists(CONTROLLERS_DIR):
+                        os.makedirs(CONTROLLERS_DIR)
+                    filepath = os.path.join(CONTROLLERS_DIR, f"{profile_name}.json")
+                    profile_data = {
+                        "name": profile_name,
+                        "description": description,
+                        "revisions": dict(self.revision_config)
+                    }
+                    with open(filepath, 'w') as f:
+                        json.dump(profile_data, f, indent=2)
+                    self.current_profile = profile_name
+                    profile_var.set(profile_name)
+                    refresh_profile_dropdown()
+                    print(f"[GUI] Saved profile '{profile_name}' to: {filepath}")
+                    messagebox.showinfo("Success", f"Profile '{profile_name}' saved")
+                    dialog.destroy()
                 except Exception as e:
                     messagebox.showerror("Error", f"Failed to save profile: {e}")
+
+            btn_frame = tk.Frame(dialog)
+            btn_frame.grid(row=2, column=0, columnspan=2, pady=15)
+            tk.Button(btn_frame, text="Save", command=do_save, width=10).pack(side=tk.LEFT, padx=5)
+            tk.Button(btn_frame, text="Cancel", command=dialog.destroy, width=10).pack(side=tk.LEFT, padx=5)
+
+            name_entry.focus_set()
 
         def load_profile_from_file():
             filepath = filedialog.askopenfilename(
@@ -1640,7 +1722,7 @@ class OpenProtocolEmulator:
         profile_menu.config(width=12)
         profile_menu.grid(row=0, column=1, sticky=tk.W, padx=2, pady=2)
         tk.Button(revision_frame, text="Apply Profile", command=apply_profile_selection).grid(row=0, column=2, padx=2, pady=2)
-        tk.Button(revision_frame, text="Save...", command=save_profile_to_file).grid(row=0, column=3, padx=2, pady=2)
+        tk.Button(revision_frame, text="Save...", command=save_profile_dialog).grid(row=0, column=3, padx=2, pady=2)
         tk.Button(revision_frame, text="Load...", command=load_profile_from_file).grid(row=0, column=4, padx=2, pady=2)
 
         # Row 1: MID 0002 and MID 0004
