@@ -585,6 +585,48 @@ class OpenProtocolEmulator:
 
         return self.current_vin.ljust(25)[:25]
 
+    def _build_mid0061_data(self, revision: int, result_params: dict) -> str:
+        """Build MID 0061 tightening result data for given revision (1-7)."""
+        fields = []
+
+        fields.append(f"01{result_params['cell_id']:04d}")
+        fields.append(f"02{result_params['channel_id']:02d}")
+        fields.append(f"03{result_params['controller_name']}")
+        fields.append(f"04{result_params['vin']}")
+        fields.append(f"05{result_params['job_id']:02d}")
+        fields.append(f"06{result_params['pset_id']}")
+        fields.append(f"07{result_params['batch_size']:04d}")
+        fields.append(f"08{result_params['batch_counter']:04d}")
+        fields.append(f"09{result_params['status']}")
+        fields.append(f"10{result_params['torque_status']}")
+        fields.append(f"11{result_params['angle_status']}")
+        fields.append(f"12{result_params['torque_min']:06d}")
+        fields.append(f"13{result_params['torque_max']:06d}")
+        fields.append(f"14{result_params['torque_target']:06d}")
+        fields.append(f"15{result_params['torque_final']:06d}")
+        fields.append(f"16{result_params['angle_min']:05d}")
+        fields.append(f"17{result_params['angle_max']:05d}")
+        fields.append(f"18{result_params['angle_target']:05d}")
+        fields.append(f"19{result_params['angle_final']:05d}")
+        fields.append(f"20{result_params['timestamp']}")
+        fields.append(f"21{result_params['pset_change_time']}")
+        fields.append(f"22{result_params['batch_status']}")
+        fields.append(f"23{result_params['tightening_id']:010d}")
+
+        if revision >= 3:
+            fields.append(f"24{self.strategy_code:04d}")
+
+        if revision >= 4:
+            fields.append(f"25{self.strategy_options}")
+
+        if revision >= 5:
+            fields.append(f"26{self.tightening_error_status_2:010d}")
+
+        if revision >= 6:
+            fields.append(f"27{self.stage_result_count:02d}")
+
+        return "".join(fields)
+
     def _parse_vin(self, vin_string):
         """Parses VIN into prefix and numeric parts."""
         match = re.match(r'^(.*?)(\d+)$', vin_string)
