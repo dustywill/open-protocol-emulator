@@ -950,6 +950,103 @@ class OpenProtocolEmulator:
                 self.batch_counter = 0
             print("[Batch] VIN incremented and counter reset.")
 
+    def send_multi_spindle_result(self):
+        """Generate and send a simulated MID 0101 multi-spindle result (supports Rev 1-5)."""
+        if not self.tool_enabled:
+            print("[MultiSpindle] Send prevented: Tool is disabled.")
+            return
+        if not self.session_active or not self.multi_spindle_subscribed:
+            print("[MultiSpindle] Send prevented: Session inactive or not subscribed.")
+            return
+
+        self.sync_tightening_id = (self.sync_tightening_id + 1) % 65536
+        timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d:%H:%M:%S")
+        revision = self.multi_spindle_requested_rev
+
+        current_pset_params = self.pset_parameters.get(self.current_pset)
+        if current_pset_params:
+            target_torque = current_pset_params["target_torque"]
+            torque_min = current_pset_params["torque_min"]
+            torque_max = current_pset_params["torque_max"]
+            target_angle = current_pset_params["target_angle"]
+            angle_min = current_pset_params["angle_min"]
+            angle_max = current_pset_params["angle_max"]
+            batch_size = current_pset_params["batch_size"]
+        else:
+            target_torque, torque_min, torque_max = 50.00, 47.00, 53.00
+            target_angle, angle_min, angle_max = 90, 80, 100
+            batch_size = self.target_batch_size
+
+        pset_change_ts = (self.pset_last_change.strftime("%Y-%m-%d:%H:%M:%S")
+                          if self.pset_last_change else timestamp_str)
+
+        fields = []
+        fields.append(f"01{self.num_spindles:02d}")
+        fields.append(f"02{self.current_vin.ljust(25)[:25]}")
+        fields.append(f"03{0:02d}")
+        fields.append(f"04{(self.current_pset if self.current_pset else '0').rjust(3, '0')}")
+        fields.append(f"05{batch_size:04d}")
+        fields.append(f"06{self.batch_counter:04d}")
+        fields.append(f"07{'0'}")
+        fields.append(f"08{int(torque_min * 100):06d}")
+        fields.append(f"09{int(torque_max * 100):06d}")
+        fields.append(f"10{int(target_torque * 100):06d}")
+        fields.append(f"11{int(angle_min):05d}")
+        fields.append(f"12{int(angle_max):05d}")
+        fields.append(f"13{int(target_angle):05d}")
+        fields.append(f"14{pset_change_ts}")
+        fields.append(f"15{timestamp_str}")
+        fields.append(f"16{self.sync_tightening_id:05d}")
+
+        spindle_results = []
+        all_ok = True
+        for spindle_num in range(1, self.num_spindles + 1):
+            is_nok = random.random() < self.nok_probability
+            status = "0" if is_nok else "1"
+            if is_nok:
+                all_ok = False
+
+            torque_status = "1"
+            angle_status = "1"
+            actual_torque = random.uniform(torque_min, torque_max)
+            actual_angle = random.uniform(angle_min, angle_max)
+
+            if is_nok:
+                if random.choice(["torque", "angle"]) == "torque":
+                    torque_status = random.choice(["0", "2"])
+                    actual_torque = random.uniform(torque_min - 5, torque_min - 0.1) if torque_status == "0" else random.uniform(torque_max + 0.1, torque_max + 5)
+                else:
+                    angle_status = random.choice(["0", "2"])
+                    actual_angle = random.uniform(angle_min - 20, angle_min - 1) if angle_status == "0" else random.uniform(angle_max + 1, angle_max + 20)
+
+            spindle_results.append({
+                "num": spindle_num,
+                "channel": spindle_num,
+                "status": status,
+                "torque_status": torque_status,
+                "angle_status": angle_status,
+                "torque": int(actual_torque * 100),
+                "angle": int(actual_angle)
+            })
+
+        overall_status = "1" if all_ok else "0"
+        fields.append(f"17{overall_status}")
+
+        spindle_data = ""
+        for s in spindle_results:
+            spindle_data += f"{s['num']:02d}{s['channel']:02d}{s['status']}{s['torque_status']}{s['torque']:06d}{s['angle_status']}{s['angle']:05d}"
+        fields.append(f"18{spindle_data}")
+
+        if revision >= 4:
+            fields.append(f"19{'001'}")
+
+        if revision >= 5:
+            fields.append(f"20{0:05d}")
+
+        data = "".join(fields)
+        result_msg = build_message(101, rev=revision, data=data, no_ack=self.multi_spindle_no_ack)
+        self.send_to_client(result_msg)
+        print(f"[MultiSpindle] Sent result (MID 0101 rev {revision}, SyncID: {self.sync_tightening_id:05d}). Status: {'OK' if all_ok else 'NOK'}, Spindles: {self.num_spindles}")
 
     def send_tightening_results_loop(self):
         """Periodically send a simulated MID 0061 tightening result."""
