@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: MID Format Audit** - Audit all existing MID implementations against Open Protocol spec
 - [x] **Phase 3: MID Format Fixes** - Fix spec deviations discovered during audit
 - [x] **Phase 3.5: Architecture Refactor** - INSERTED: Refactor process_message() to registry-based dispatch
-- [ ] **Phase 4: Multi-Revision Implementation** - Implement revision 2+ response formats for all existing MIDs
+- [ ] **Phase 4: Multi-Revision Implementation** - In progress - Implement revision 2+ response formats for all existing MIDs
 - [ ] **Phase 5: New MID Implementation** - Implement MID 0082, 0100-0102, 0214-0218
 - [ ] **Phase 6: Revision Configuration** - Add per-MID revision levels and controller profiles
 - [ ] **Phase 7: GUI Expansion** - Add revision configuration controls to Tkinter interface
@@ -112,7 +112,7 @@ Key work:
 - Add revision negotiation logic per Open Protocol spec
 
 Plans:
-- [ ] 04-01: Multi-revision support for communication MIDs (0001-0005)
+- [x] 04-01: Multi-revision support for communication MIDs (0001-0005)
 - [ ] 04-02: Multi-revision support for parameter set MIDs (0014-0018)
 - [ ] 04-03: Multi-revision support for tool control MIDs (0042-0043)
 - [ ] 04-04: Multi-revision support for VIN MIDs (0050-0054)
@@ -179,7 +179,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 3.5 → 4 → 5 → 6 → 7
 | 2. MID Format Audit | 3/3 | Complete | 2026-01-16 |
 | 3. MID Format Fixes | 3/3 | Complete | 2026-01-16 |
 | 3.5. Architecture Refactor | 1/1 | Complete | 2026-01-16 |
-| 4. Multi-Revision Implementation | 0/5 | Not started | - |
+| 4. Multi-Revision Implementation | 1/5 | In progress | - |
 | 5. New MID Implementation | 0/3 | Planned | - |
 | 6. Revision Configuration | 0/2 | Not started | - |
 | 7. GUI Expansion | 0/2 | Not started | - |
