@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-16)
 ## Current Position
 
 Phase: 5 of 7 (New MID Implementation)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-01-16 — Completed 05-01-PLAN.md
+Last activity: 2026-01-16 — Completed 05-02-PLAN.md
 
-Progress: ████████░░ 79%
+Progress: █████████░ 84%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
+- Total plans completed: 16
 - Average duration: ~8 min
-- Total execution time: ~124 min
+- Total execution time: ~132 min
 
 **By Phase:**
 
@@ -32,10 +32,10 @@ Progress: ████████░░ 79%
 | 03 | 3 | ~21min | ~7min |
 | 03.5 | 1 | ~12min | ~12min |
 | 04 | 5 | ~36min | ~7min |
-| 05 | 1 | ~5min | ~5min |
+| 05 | 2 | ~13min | ~6min |
 
 **Recent Trend:**
-- Last 5 plans: 04-02, 04-03, 04-04, 04-05, 05-01
+- Last 5 plans: 04-03, 04-04, 04-05, 05-01, 05-02
 - Trend: Stable (simple MID plans efficient)
 
 ## Accumulated Context
@@ -74,6 +74,9 @@ Recent decisions affecting current work:
 | 04-05 | Result subscription tracks revision via result_subscribed_rev | Consistent with Pset/VIN subscription pattern |
 | 05-01 | MID 0082 uses error code 20 for invalid data | Both length and format errors use same code per spec |
 | 05-01 | controller_time stores raw time string | Protocol compliance, not internal datetime object |
+| 05-02 | MID 0101 uses 18-byte per-spindle structure | Per Open Protocol spec: num(2), channel(2), status(1), torque_status(1), torque(6), angle_status(1), angle(5) |
+| 05-02 | System sub type defaults to '001' | Normal tightening spindles per spec |
+| 05-02 | Sync tightening ID wraps at 65536 | Per Open Protocol spec range for sync operations |
 
 ### Deferred Issues
 
@@ -86,6 +89,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Completed 05-01-PLAN.md
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
-Next: 05-02-PLAN.md (MID 0100-0102 multi-spindle)
+Next: 05-03-PLAN.md (next MID implementation)
