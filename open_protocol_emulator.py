@@ -1519,6 +1519,62 @@ class OpenProtocolEmulator:
                     print(f"  MID {mid:04d}: rev {rev}")
             except ValueError as e:
                 messagebox.showerror("Error", f"Invalid revision value: {e}")
+
+        def apply_profile_selection():
+            selected_profile = profile_var.get()
+            try:
+                self.apply_profile(selected_profile)
+                rev_mid_0002_var.set(str(self.revision_config.get(2, 6)))
+                rev_mid_0004_var.set(str(self.revision_config.get(4, 3)))
+                rev_mid_0015_var.set(str(self.revision_config.get(15, 2)))
+                rev_mid_0041_var.set(str(self.revision_config.get(41, 5)))
+                rev_mid_0052_var.set(str(self.revision_config.get(52, 2)))
+                rev_mid_0061_var.set(str(self.revision_config.get(61, 7)))
+                print(f"[GUI] Applied profile: {selected_profile}")
+                print(f"  Description: {self.get_profile_description(selected_profile)}")
+            except ValueError as e:
+                messagebox.showerror("Error", str(e))
+
+        def save_profile_to_file():
+            filepath = filedialog.asksaveasfilename(
+                defaultextension=".json",
+                filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+                title="Save Profile"
+            )
+            if filepath:
+                try:
+                    profile_name = profile_var.get()
+                    if profile_name in self.DEFAULT_PROFILES:
+                        profile_name = "custom"
+                    self.save_profile_to_file(filepath, profile_name)
+                    print(f"[GUI] Saved profile to: {filepath}")
+                    messagebox.showinfo("Success", f"Profile saved to {filepath}")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to save profile: {e}")
+
+        def load_profile_from_file():
+            filepath = filedialog.askopenfilename(
+                filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+                title="Load Profile"
+            )
+            if filepath:
+                try:
+                    loaded_name = self.load_profile_from_file(filepath)
+                    profile_var.set(loaded_name)
+                    rev_mid_0002_var.set(str(self.revision_config.get(2, 6)))
+                    rev_mid_0004_var.set(str(self.revision_config.get(4, 3)))
+                    rev_mid_0015_var.set(str(self.revision_config.get(15, 2)))
+                    rev_mid_0041_var.set(str(self.revision_config.get(41, 5)))
+                    rev_mid_0052_var.set(str(self.revision_config.get(52, 2)))
+                    rev_mid_0061_var.set(str(self.revision_config.get(61, 7)))
+                    print(f"[GUI] Loaded profile '{loaded_name}' from: {filepath}")
+                    messagebox.showinfo("Success", f"Profile '{loaded_name}' loaded")
+                except FileNotFoundError:
+                    messagebox.showerror("Error", f"File not found: {filepath}")
+                except ValueError as e:
+                    messagebox.showerror("Error", f"Invalid profile file: {e}")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to load profile: {e}")
         # --- End GUI Callbacks ---
 
         # --- GUI Layout ---
