@@ -1547,6 +1547,31 @@ class OpenProtocolEmulator:
 
         # --- End Pset Settings Frame ---
 
+        # --- Revision Configuration Frame ---
+        revision_frame = tk.LabelFrame(root, text="Revision Configuration", padx=5, pady=5)
+        revision_frame.pack(padx=10, pady=5, fill=tk.X)
+
+        # Row 0: MID 0002 and MID 0004
+        tk.Label(revision_frame, text="MID 0002 (Comm Start):").grid(row=0, column=0, sticky=tk.W, padx=2, pady=2)
+        tk.Spinbox(revision_frame, from_=1, to=6, textvariable=rev_mid_0002_var, width=3).grid(row=0, column=1, sticky=tk.W, padx=2, pady=2)
+        tk.Label(revision_frame, text="MID 0004 (Error):").grid(row=0, column=2, sticky=tk.W, padx=2, pady=2)
+        tk.Spinbox(revision_frame, from_=1, to=3, textvariable=rev_mid_0004_var, width=3).grid(row=0, column=3, sticky=tk.W, padx=2, pady=2)
+
+        # Row 1: MID 0015 and MID 0041
+        tk.Label(revision_frame, text="MID 0015 (Pset):").grid(row=1, column=0, sticky=tk.W, padx=2, pady=2)
+        tk.Spinbox(revision_frame, from_=1, to=2, textvariable=rev_mid_0015_var, width=3).grid(row=1, column=1, sticky=tk.W, padx=2, pady=2)
+        tk.Label(revision_frame, text="MID 0041 (Tool Data):").grid(row=1, column=2, sticky=tk.W, padx=2, pady=2)
+        tk.Spinbox(revision_frame, from_=1, to=5, textvariable=rev_mid_0041_var, width=3).grid(row=1, column=3, sticky=tk.W, padx=2, pady=2)
+
+        # Row 2: MID 0052 and MID 0061
+        tk.Label(revision_frame, text="MID 0052 (VIN):").grid(row=2, column=0, sticky=tk.W, padx=2, pady=2)
+        tk.Spinbox(revision_frame, from_=1, to=2, textvariable=rev_mid_0052_var, width=3).grid(row=2, column=1, sticky=tk.W, padx=2, pady=2)
+        tk.Label(revision_frame, text="MID 0061 (Result):").grid(row=2, column=2, sticky=tk.W, padx=2, pady=2)
+        tk.Spinbox(revision_frame, from_=1, to=7, textvariable=rev_mid_0061_var, width=3).grid(row=2, column=3, sticky=tk.W, padx=2, pady=2)
+
+        # Apply button
+        tk.Button(revision_frame, text="Apply Revisions", command=apply_revision_settings).grid(row=0, column=4, rowspan=3, padx=10, pady=2, sticky=tk.NS)
+        # --- End Revision Configuration Frame ---
 
         control_frame = tk.LabelFrame(root, text="Controls", padx=5, pady=5)
         control_frame.pack(padx=10, pady=5, fill=tk.X)
